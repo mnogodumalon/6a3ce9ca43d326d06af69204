@@ -1,0 +1,22 @@
+{
+  "entities": {
+    "Schuldnerverwaltung": {
+      "placeholders_set": 11,
+      "defaults_keys": [],
+      "computed_keys": [],
+      "reason": "Reine Stammdaten-Verwaltung ohne numerische Beziehungen oder berechenbare Felder. Nur Text, Email, Date-Felder vorhanden, keine Applookup-Kette, kein Preis-Feld, kein Status-Lookup mit Vorbelegen-Semantik."
+    },
+    "Forderungserfassung": {
+      "placeholders_set": 8,
+      "defaults_keys": ["rechnungsdatum", "faelligkeitsdatum", "zahlungsstatus", "gezahlter_betrag"],
+      "computed_keys": ["_ausstehender_betrag"],
+      "reason": "Rechnungs-Management mit Zahlungslogik. Ausstehender Betrag = Rechnungsbetrag - Gezahlter Betrag ist Pflicht-Computed für User-Überblick. Rechnungsdatum auf heute (Erfassungs-Timestamp), Fälligkeitsdatum +14 Tage (Standard-Zahlungsfrist), Status auf 'Offen', gezahlter auf 0 (erst nach Eingang verfügbar)."
+    },
+    "Überzahlungsbearbeitung": {
+      "placeholders_set": 11,
+      "defaults_keys": ["eingangsdatum_zahlung", "bearbeitungsdatum", "bearbeitungsstatus", "ueberzahlter_betrag"],
+      "computed_keys": ["_restschuld"],
+      "reason": "Rückzahlungs-Verwaltung mit Applookup auf Forderungserfassung. Restschuld nach Rückzahlung = Rechnungsbetrag - Gezahlter Betrag - Überzahlter Betrag zeigt dem Sachbearbeiter sofort den finalen Kontostand. Eingangsdatum auf heute (Zahlungseingang), Bearbeitungsdatum auf heute (nachbearbeitung), Status auf 'Offen' (Workflow-Start), Überzahlbetrag auf 0 (wird manuell eingegeben)."
+    }
+  }
+}

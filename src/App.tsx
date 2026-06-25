@@ -6,7 +6,6 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorBusProvider } from '@/components/ErrorBus';
 import { Layout } from '@/components/Layout';
 import DashboardOverview from '@/pages/DashboardOverview';
-import { WorkflowPlaceholders } from '@/components/WorkflowPlaceholders';
 import AdminPage from '@/pages/AdminPage';
 import SchuldnerverwaltungPage from '@/pages/SchuldnerverwaltungPage';
 import SchuldnerverwaltungDetailPage from '@/pages/SchuldnerverwaltungDetailPage';
@@ -20,6 +19,8 @@ import PublicFormUeberzahlungsbearbeitung from '@/pages/public/PublicForm_Ueberz
 // <public:imports>
 // </public:imports>
 // <custom:imports>
+const ForderungErfassenPage = lazy(() => import('@/pages/intents/ForderungErfassenPage'));
+const UeberzahlungBearbeitenPage = lazy(() => import('@/pages/intents/UeberzahlungBearbeitenPage'));
 // </custom:imports>
 
 export default function App() {
@@ -35,7 +36,7 @@ export default function App() {
               {/* <public:routes> */}
               {/* </public:routes> */}
               <Route element={<Layout />}>
-                <Route index element={<><div className="mb-8"><WorkflowPlaceholders /></div><DashboardOverview /></>} />
+                <Route index element={<DashboardOverview />} />
                 <Route path="schuldnerverwaltung" element={<SchuldnerverwaltungPage />} />
                 <Route path="schuldnerverwaltung/:id" element={<SchuldnerverwaltungDetailPage />} />
                 <Route path="forderungserfassung" element={<ForderungserfassungPage />} />
@@ -44,6 +45,8 @@ export default function App() {
                 <Route path="ueberzahlungsbearbeitung/:id" element={<UeberzahlungsbearbeitungDetailPage />} />
                 <Route path="admin" element={<AdminPage />} />
                 {/* <custom:routes> */}
+                <Route path="intents/forderung-erfassen" element={<Suspense fallback={null}><ForderungErfassenPage /></Suspense>} />
+                <Route path="intents/ueberzahlung-bearbeiten" element={<Suspense fallback={null}><UeberzahlungBearbeitenPage /></Suspense>} />
                 {/* </custom:routes> */}
               </Route>
             </Routes>

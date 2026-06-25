@@ -44,6 +44,8 @@ import {
   IconCurrencyEuro,
   IconArrowRight,
   IconX,
+  IconChevronRight,
+  IconReceiptOff,
 } from '@tabler/icons-react';
 
 const APPGROUP_ID = '6a3ce9ca43d326d06af69204';
@@ -193,6 +195,36 @@ export default function DashboardOverview() {
 
   return (
     <div className="space-y-6">
+      {/* Workflow Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <a
+          href="#/intents/forderung-erfassen"
+          className="flex items-center gap-4 bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow no-underline"
+        >
+          <div className="shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <IconFileInvoice size={20} className="text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm text-foreground">Forderung erfassen</p>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">Schuldner auswählen und neue Forderung anlegen</p>
+          </div>
+          <IconChevronRight size={16} className="text-muted-foreground shrink-0" />
+        </a>
+        <a
+          href="#/intents/ueberzahlung-bearbeiten"
+          className="flex items-center gap-4 bg-card border border-border border-l-4 border-l-primary rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow no-underline"
+        >
+          <div className="shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <IconReceiptOff size={20} className="text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm text-foreground">Überzahlung bearbeiten</p>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">Forderung auswählen und Überzahlung mit Rückerstattung erfassen</p>
+          </div>
+          <IconChevronRight size={16} className="text-muted-foreground shrink-0" />
+        </a>
+      </div>
+
       {/* KPI Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard

@@ -1,6 +1,7 @@
 // AUTOMATICALLY GENERATED SERVICE
 import { APP_IDS, LOOKUP_OPTIONS, FIELD_TYPES } from '@/types/app';
-import type { Schuldnerverwaltung, Forderungserfassung, Ueberzahlungsbearbeitung, CreateSchuldnerverwaltung, CreateForderungserfassung, CreateUeberzahlungsbearbeitung } from '@/types/app';
+import { ensureUploadableImage } from '@/lib/ai';
+import type { Ueberzahlungsbearbeitung, Forderungserfassung, Debitor, CreateUeberzahlungsbearbeitung, CreateForderungserfassung, CreateDebitor } from '@/types/app';
 
 // Base Configuration
 const API_BASE_URL = 'https://my.living-apps.de/rest';
@@ -94,10 +95,12 @@ async function callApi(method: string, endpoint: string, data?: any, options?: C
     throw netErr;
   }
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) window.dispatchEvent(new Event('auth-error'));
+    // 401/403 go to the login screen only — never to the errorbus (repair can't fix auth).
+    const isAuthError = response.status === 401 || response.status === 403;
+    if (isAuthError) window.dispatchEvent(new Event('auth-error'));
     const { message, raw } = await parseErrorBody(response);
     const err = new LivingAppsApiError(message, response.status, raw);
-    if (!silent) {
+    if (!silent && !isAuthError) {
       window.dispatchEvent(new CustomEvent('errorbus:emit', { detail: {
         source: 'api',
         status: err.status,
@@ -118,6 +121,10 @@ async function callApi(method: string, endpoint: string, data?: any, options?: C
 
 /** Upload a file to LivingApps. Returns the file URL for use in record fields. */
 export async function uploadFile(file: File | Blob, filename?: string): Promise<string> {
+  // HEIC/HEIF (iPhone photos) crash the server-side image decoder (500).
+  // Convert to JPEG in the browser BEFORE upload — every upload path routes
+  // through here, so this one guard covers form fields AND attachments.
+  if (file instanceof File) file = await ensureUploadableImage(file);
   const formData = new FormData();
   formData.append('file', file, filename ?? (file instanceof File ? file.name : 'upload'));
   const res = await fetch(`${API_BASE_URL}/files`, {
@@ -308,27 +315,27 @@ export async function getAppGroups(): Promise<AppGroupInfo[]> {
 }
 
 export class LivingAppsService {
-  // --- SCHULDNERVERWALTUNG ---
-  static async getSchuldnerverwaltung(): Promise<Schuldnerverwaltung[]> {
-    const data = await callApi('GET', `/apps/${APP_IDS.SCHULDNERVERWALTUNG}/records`);
+  // --- UEBERZAHLUNGSBEARBEITUNG ---
+  static async getUeberzahlungsbearbeitung(): Promise<Ueberzahlungsbearbeitung[]> {
+    const data = await callApi('GET', `/apps/${APP_IDS.UEBERZAHLUNGSBEARBEITUNG}/records`);
     const records = Object.entries(data).map(([id, rec]: [string, any]) => ({
       record_id: id, ...rec
-    })) as Schuldnerverwaltung[];
-    return enrichLookupFields(records, 'schuldnerverwaltung');
+    })) as Ueberzahlungsbearbeitung[];
+    return enrichLookupFields(records, 'ueberzahlungsbearbeitung');
   }
-  static async getSchuldnerverwaltungEntry(id: string): Promise<Schuldnerverwaltung | undefined> {
-    const data = await callApi('GET', `/apps/${APP_IDS.SCHULDNERVERWALTUNG}/records/${id}`);
-    const record = { record_id: data.id, ...data } as Schuldnerverwaltung;
-    return enrichLookupFields([record], 'schuldnerverwaltung')[0];
+  static async getUeberzahlungsbearbeitungEntry(id: string): Promise<Ueberzahlungsbearbeitung | undefined> {
+    const data = await callApi('GET', `/apps/${APP_IDS.UEBERZAHLUNGSBEARBEITUNG}/records/${id}`);
+    const record = { record_id: data.id, ...data } as Ueberzahlungsbearbeitung;
+    return enrichLookupFields([record], 'ueberzahlungsbearbeitung')[0];
   }
-  static async createSchuldnerverwaltungEntry(fields: CreateSchuldnerverwaltung) {
-    return callApi('POST', `/apps/${APP_IDS.SCHULDNERVERWALTUNG}/records`, { fields: cleanFieldsForApi(fields as any, 'schuldnerverwaltung') });
+  static async createUeberzahlungsbearbeitungEntry(fields: CreateUeberzahlungsbearbeitung) {
+    return callApi('POST', `/apps/${APP_IDS.UEBERZAHLUNGSBEARBEITUNG}/records`, { fields: cleanFieldsForApi(fields as any, 'ueberzahlungsbearbeitung') });
   }
-  static async updateSchuldnerverwaltungEntry(id: string, fields: Partial<CreateSchuldnerverwaltung>) {
-    return callApi('PATCH', `/apps/${APP_IDS.SCHULDNERVERWALTUNG}/records/${id}`, { fields: cleanFieldsForApi(fields as any, 'schuldnerverwaltung') });
+  static async updateUeberzahlungsbearbeitungEntry(id: string, fields: Partial<CreateUeberzahlungsbearbeitung>) {
+    return callApi('PATCH', `/apps/${APP_IDS.UEBERZAHLUNGSBEARBEITUNG}/records/${id}`, { fields: cleanFieldsForApi(fields as any, 'ueberzahlungsbearbeitung') });
   }
-  static async deleteSchuldnerverwaltungEntry(id: string) {
-    return callApi('DELETE', `/apps/${APP_IDS.SCHULDNERVERWALTUNG}/records/${id}`);
+  static async deleteUeberzahlungsbearbeitungEntry(id: string) {
+    return callApi('DELETE', `/apps/${APP_IDS.UEBERZAHLUNGSBEARBEITUNG}/records/${id}`);
   }
 
   // --- FORDERUNGSERFASSUNG ---
@@ -354,27 +361,27 @@ export class LivingAppsService {
     return callApi('DELETE', `/apps/${APP_IDS.FORDERUNGSERFASSUNG}/records/${id}`);
   }
 
-  // --- UEBERZAHLUNGSBEARBEITUNG ---
-  static async getUeberzahlungsbearbeitung(): Promise<Ueberzahlungsbearbeitung[]> {
-    const data = await callApi('GET', `/apps/${APP_IDS.UEBERZAHLUNGSBEARBEITUNG}/records`);
+  // --- DEBITOR ---
+  static async getDebitor(): Promise<Debitor[]> {
+    const data = await callApi('GET', `/apps/${APP_IDS.DEBITOR}/records`);
     const records = Object.entries(data).map(([id, rec]: [string, any]) => ({
       record_id: id, ...rec
-    })) as Ueberzahlungsbearbeitung[];
-    return enrichLookupFields(records, 'ueberzahlungsbearbeitung');
+    })) as Debitor[];
+    return enrichLookupFields(records, 'debitor');
   }
-  static async getUeberzahlungsbearbeitungEntry(id: string): Promise<Ueberzahlungsbearbeitung | undefined> {
-    const data = await callApi('GET', `/apps/${APP_IDS.UEBERZAHLUNGSBEARBEITUNG}/records/${id}`);
-    const record = { record_id: data.id, ...data } as Ueberzahlungsbearbeitung;
-    return enrichLookupFields([record], 'ueberzahlungsbearbeitung')[0];
+  static async getDebitorEntry(id: string): Promise<Debitor | undefined> {
+    const data = await callApi('GET', `/apps/${APP_IDS.DEBITOR}/records/${id}`);
+    const record = { record_id: data.id, ...data } as Debitor;
+    return enrichLookupFields([record], 'debitor')[0];
   }
-  static async createUeberzahlungsbearbeitungEntry(fields: CreateUeberzahlungsbearbeitung) {
-    return callApi('POST', `/apps/${APP_IDS.UEBERZAHLUNGSBEARBEITUNG}/records`, { fields: cleanFieldsForApi(fields as any, 'ueberzahlungsbearbeitung') });
+  static async createDebitorEntry(fields: CreateDebitor) {
+    return callApi('POST', `/apps/${APP_IDS.DEBITOR}/records`, { fields: cleanFieldsForApi(fields as any, 'debitor') });
   }
-  static async updateUeberzahlungsbearbeitungEntry(id: string, fields: Partial<CreateUeberzahlungsbearbeitung>) {
-    return callApi('PATCH', `/apps/${APP_IDS.UEBERZAHLUNGSBEARBEITUNG}/records/${id}`, { fields: cleanFieldsForApi(fields as any, 'ueberzahlungsbearbeitung') });
+  static async updateDebitorEntry(id: string, fields: Partial<CreateDebitor>) {
+    return callApi('PATCH', `/apps/${APP_IDS.DEBITOR}/records/${id}`, { fields: cleanFieldsForApi(fields as any, 'debitor') });
   }
-  static async deleteUeberzahlungsbearbeitungEntry(id: string) {
-    return callApi('DELETE', `/apps/${APP_IDS.UEBERZAHLUNGSBEARBEITUNG}/records/${id}`);
+  static async deleteDebitorEntry(id: string) {
+    return callApi('DELETE', `/apps/${APP_IDS.DEBITOR}/records/${id}`);
   }
 
 }

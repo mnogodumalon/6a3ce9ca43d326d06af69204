@@ -201,20 +201,34 @@
 }
 
 /* ── LivingApps Chrome-Widgets (loader.js) ─────────────────────────────
- * Die Widgets bringen eigene z-Indizes im Shadow DOM mit (Header 100000,
- * Drawer-Overlay 50). Host-Styles auf dem Element schlagen die :host-
- * Defaults im Shadow DOM — so reihen wir sie in unsere z-Leiter ein,
- * damit Dialoge/Overlays (--z-overlay) das Chrome weiterhin abdecken. */
+ * Der Header bringt z-index 100000 im Shadow-:host mit — Host-Styles auf
+ * dem Element schlagen die :host-Defaults, so reiht er sich in unsere
+ * z-Leiter ein und Dialoge/Overlays (--z-overlay) decken ihn weiterhin ab.
+ * Der Drawer bekommt KEINEN Override mehr: Seit dem Widget-Release vom
+ * 23.07.2026 ist er auf Desktop eine In-Flow-Spalte (z 40 nur für den
+ * Hover-Peek) und mobil ein Fixed-Overlay (z 50) — beides liegt korrekt
+ * unter unseren Dialogen bzw. bewusst über dem Header. */
 la-header-bar-widget {
   z-index: var(--z-chrome);
 }
-la-drawer[data-overlay] {
-  z-index: var(--z-sidebar);
+
+/* Desktop: Der Drawer sitzt in der Flex-Zeile des Layouts. Sein
+ * :host{height:100%} kollabiert ohne definite Parent-Höhe zu 0 und
+ * unterbindet das Flex-Stretching — height:auto (Host-Style schlägt
+ * :host) lässt ihn auf Zeilenhöhe strecken. Mobil NICHT überschreiben:
+ * dort ist er ein Fixed-Overlay mit height:100dvh. */
+@media (min-width: 768px) {
+  la-drawer[data-overlay] {
+    height: auto;
+  }
 }
 
 /* Pre-Upgrade (Loader noch nicht geladen): Header-Platzhalter hält die
- * Höhe (Werte = placeholderStyle des Widgets), der Drawer bleibt samt
- * geslottetem Inhalt unsichtbar statt als rohes Light-DOM zu flackern. */
+ * Höhe (Werte = placeholderStyle des Widgets). Der Drawer reserviert ab
+ * md seine Spaltenbreite (In-Flow-Vertrag: er verdrängt den Content
+ * selbst), damit die Seite beim Upgrade nicht springt; sein geslotteter
+ * Inhalt bleibt via visibility unsichtbar statt als rohes Light-DOM zu
+ * flackern. Mobil (Fixed-Overlay) nimmt er vor dem Upgrade keinen Platz. */
 la-header-bar-widget:not(:defined) {
   display: block;
   min-height: 77px;
@@ -222,5 +236,17 @@ la-header-bar-widget:not(:defined) {
   border-bottom: 1px solid #e5e7eb;
 }
 la-drawer:not(:defined) {
-  display: none;
+  visibility: hidden;
+}
+@media (min-width: 768px) {
+  la-drawer:not(:defined) {
+    display: block;
+    width: var(--la-drawer-w, 364px);
+    min-width: var(--la-drawer-w, 364px);
+  }
+}
+@media (max-width: 767.98px) {
+  la-drawer:not(:defined) {
+    display: none;
+  }
 }

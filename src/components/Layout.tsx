@@ -117,6 +117,13 @@ export function Layout() {
         </>
       )}
 
+      {/* Neuer Drawer-Vertrag (Widget-Release 23.07.2026): Auf Desktop ist der
+          Drawer eine IN-FLOW-Spalte, die den Content selbst verdrängt — Host
+          und Content gehören in eine Flex-Zeile, der Drawer bezieht seine
+          Höhe aus der Zeile. Eingeklappt bleibt ein schmaler Streifen mit
+          Hover-Peek. Mobil bleibt er ein Fixed-Overlay (verlässt den Flow).
+          Das frühere Content-Padding über --la-drawer-rect-width entfällt. */}
+      <div className={IS_EMBED ? "" : "flex items-stretch min-h-[calc(100dvh_-_var(--la-header-bar-height,0px))]"}>
       {!IS_EMBED && (
         <la-drawer ref={drawerRef}>
           {/* Darstellung-Umschalter — identisch zur Datenverwaltung: der
@@ -166,12 +173,7 @@ export function Layout() {
         </la-drawer>
       )}
 
-      {/* Der Drawer ist ein Overlay und schiebt den Content nie selbst zur
-          Seite — er publiziert seine Breite als --la-drawer-rect-width auf
-          <html>; ab md rückt der Content darüber ein (mobil deckt der Drawer
-          den Viewport, dort kein Offset). Ohne Widgets (Embed, Loader-Fehler)
-          greift der 0px-Fallback. */}
-      <div className={IS_EMBED ? "" : "md:pl-[var(--la-drawer-rect-width,0px)] transition-[padding-left] duration-200 motion-reduce:transition-none"}>
+      <div className={IS_EMBED ? "" : "flex-1 min-w-0"}>
         <main className={`max-w-screen-2xl ${IS_EMBED ? "p-2 lg:p-4" : "p-6 lg:p-8"}`}>
           {authError ? (
             <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -189,6 +191,7 @@ export function Layout() {
             <Outlet />
           )}
         </main>
+      </div>
       </div>
 
       <ChatWidget />

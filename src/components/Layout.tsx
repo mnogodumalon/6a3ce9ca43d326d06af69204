@@ -89,7 +89,11 @@ export function Layout() {
   }, [onDashboard]);
 
   return (
-    <div className="min-h-screen bg-background">
+    // Der body ist das App-Frame-Grid (Vorgabe Widget-Team, s. index.css):
+    // top/left/center-Areas. #root und dieser Wrapper sind display:contents,
+    // damit Header, Drawer und Content direkte Grid-Items werden. Die
+    // Area-Zuordnung von Header/Drawer liegt in index.css.
+    <div className="contents">
       {!IS_EMBED && (
         <la-header-bar-widget title={APP_TITLE} app-id={APP_ID}>
           {/* app-id auch am Menü selbst: erst mit eigenem App-Kontext zeigt
@@ -117,13 +121,9 @@ export function Layout() {
         </>
       )}
 
-      {/* Neuer Drawer-Vertrag (Widget-Release 23.07.2026): Auf Desktop ist der
-          Drawer eine IN-FLOW-Spalte, die den Content selbst verdrängt — Host
-          und Content gehören in eine Flex-Zeile, der Drawer bezieht seine
-          Höhe aus der Zeile. Eingeklappt bleibt ein schmaler Streifen mit
-          Hover-Peek. Mobil bleibt er ein Fixed-Overlay (verlässt den Flow).
-          Das frühere Content-Padding über --la-drawer-rect-width entfällt. */}
-      <div className={IS_EMBED ? "" : "flex items-stretch min-h-[calc(100dvh_-_var(--la-header-bar-height,0px))]"}>
+      {/* Drawer = Grid-Area "left" (Zuordnung in index.css): In-Flow-Spalte,
+          die den Content selbst verdrängt; eingeklappt ein schmaler Streifen
+          mit Hover-Peek. Mobil ein Fixed-Overlay (verlässt das Grid). */}
       {!IS_EMBED && (
         <la-drawer ref={drawerRef}>
           {/* Darstellung-Umschalter — identisch zur Datenverwaltung: der
@@ -173,7 +173,7 @@ export function Layout() {
         </la-drawer>
       )}
 
-      <div className={IS_EMBED ? "" : "flex-1 min-w-0"}>
+      <div className="[grid-area:center] min-w-0">
         <main className={`max-w-screen-2xl ${IS_EMBED ? "p-2 lg:p-4" : "p-6 lg:p-8"}`}>
           {authError ? (
             <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -191,7 +191,6 @@ export function Layout() {
             <Outlet />
           )}
         </main>
-      </div>
       </div>
 
       <ChatWidget />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { Forderungserfassung, Schuldnerverwaltung } from '@/types/app';
-import { APP_IDS } from '@/types/app';
+import type { Forderungserfassung, Debitor, LookupValue } from '@/types/app';
+import { APP_IDS, LOOKUP_OPTIONS } from '@/types/app';
 import { extractRecordId, createRecordUrl, cleanFieldsForApi, uploadFile, getUserProfile, LivingAppsService } from '@/services/livingAppsService';
 import {
   Dialog, DialogContent, DialogHeader,
@@ -15,10 +15,10 @@ import { formEnhancements, computedDeps, computedApplookupRefs } from '@/config/
 import { AttachmentsSection } from '@/components/AttachmentsSection';
 import { Textarea } from '@/components/ui/textarea';
 import { Combobox } from '@/components/Combobox';
-import { SchuldnerverwaltungDialog } from '@/components/dialogs/SchuldnerverwaltungDialog';
+import { DebitorDialog } from '@/components/dialogs/DebitorDialog';
 import { DatePicker } from '@/components/DatePicker';
 import { Checkbox } from '@/components/ui/checkbox';
-import { IconCamera, IconChevronDown, IconCircleCheck, IconClipboard, IconFileText, IconLoader2, IconPhotoPlus, IconSparkles, IconUpload, IconX } from '@tabler/icons-react';
+import { IconAlertCircle, IconCamera, IconChevronDown, IconCircleCheck, IconClipboard, IconFileText, IconLoader2, IconPhotoPlus, IconSparkles, IconUpload, IconX } from '@tabler/icons-react';
 import { fileToDataUri, extractFromInput, extractPhotoMeta, reverseGeocode, dataUriToBlob } from '@/lib/ai';
 import { lookupKey } from '@/lib/formatters';
 
@@ -26,45 +26,84 @@ interface ForderungserfassungDialogProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (fields: Forderungserfassung['fields']) => Promise<void>;
-  defaultValues?: Forderungserfassung['fields'];
+  /** SHAPE-TOLERANT: lookup fields accept the bare key (string) or the
+   *  LookupValue object; applookup fields the bare record id or the full
+   *  record URL — the dialog normalizes both. */
+  defaultValues?: Omit<Forderungserfassung['fields'], 'zahlungsstatus'> & {
+    zahlungsstatus?: LookupValue | string;
+  };
   /** Record id when editing — enables the attachments section. Omit on create. */
   recordId?: string;
-  schuldnerverwaltungList: Schuldnerverwaltung[];
+  debitorList: Debitor[];
   enablePhotoScan?: boolean;
   enablePhotoLocation?: boolean;
 }
 
-export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValues, recordId, schuldnerverwaltungList, enablePhotoScan = true, enablePhotoLocation = true }: ForderungserfassungDialogProps) {
+// defaultValues are SHAPE-TOLERANT: the dialog resolves bare lookup keys via
+// its own options and bare record ids via the field's target app — consumers
+// never carry the LookupValue/record-URL shape in their head.
+const NORMALIZE_LOOKUPS: Record<string, readonly { key: string; label: string }[]> = {
+  zahlungsstatus: LOOKUP_OPTIONS['forderungserfassung']?.['zahlungsstatus'] ?? [],
+};
+const NORMALIZE_APPLOOKUPS: Record<string, string> = {
+  schuldner: APP_IDS.DEBITOR,
+};
+function normalizeDefaults(values: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...values };
+  for (const [k, opts] of Object.entries(NORMALIZE_LOOKUPS)) {
+    const v = out[k];
+    if (typeof v === 'string') out[k] = opts.find(o => o.key === v) ?? { key: v, label: v };
+    else if (Array.isArray(v)) out[k] = v.map(x => (typeof x === 'string' ? opts.find(o => o.key === x) ?? { key: x, label: x } : x));
+  }
+  for (const [k, appId] of Object.entries(NORMALIZE_APPLOOKUPS)) {
+    const v = out[k];
+    if (typeof v === 'string' && v !== '' && !v.startsWith('http')) out[k] = createRecordUrl(appId, v);
+    else if (Array.isArray(v)) out[k] = v.map(x => (typeof x === 'string' && x !== '' && !x.startsWith('http') ? createRecordUrl(appId, x) : x));
+  }
+  return out;
+}
+
+export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValues, recordId, debitorList, enablePhotoScan = true, enablePhotoLocation = true }: ForderungserfassungDialogProps) {
   const [fields, setFields] = useState<Partial<Forderungserfassung['fields']>>({});
   const [saving, setSaving] = useState(false);
+  const normalizedDefaults = useMemo<Record<string, unknown> | undefined>(
+    () => (defaultValues ? normalizeDefaults(defaultValues as Record<string, unknown>) : undefined),
+    [defaultValues],
+  );
   // Dirty-tracking: in edit-mode the Speichern button is disabled until the
   // user actually changes something. JSON.stringify is good enough for our
   // fields (plain values + LookupValue objects + string arrays).
   const isDirty = useMemo(() => {
-    if (!defaultValues) return true;  // create-mode: always allow submit
+    if (!normalizedDefaults) return true;  // create-mode: always allow submit
     try {
-      return JSON.stringify(fields) !== JSON.stringify(defaultValues);
+      return JSON.stringify(fields) !== JSON.stringify(normalizedDefaults);
     } catch {
       return true;
     }
-  }, [fields, defaultValues]);
-  // Inline-Create state for "Schuldnerverwaltung" target. The dropdown's
+  }, [fields, normalizedDefaults]);
+  // Inline-Create state for "Debitor" target. The dropdown's
   // "+ Neuer …" option opens a sub-dialog; on submit we POST, add the new
-  // record to the local `extraSchuldnerverwaltung` list, and select it in
-  // the originating Combobox via the captured `createSchuldnerverwaltungField`.
-  const [createSchuldnerverwaltungOpen, setCreateSchuldnerverwaltungOpen] = useState(false);
-  const [createSchuldnerverwaltungInitial, setCreateSchuldnerverwaltungInitial] = useState('');
-  const [createSchuldnerverwaltungField, setCreateSchuldnerverwaltungField] = useState<string>('');
-  const [extraSchuldnerverwaltung, setExtraSchuldnerverwaltung] = useState< Schuldnerverwaltung[]>([]);
-  const schuldnerverwaltungListAll = useMemo(
-    () => [...schuldnerverwaltungList, ...extraSchuldnerverwaltung],
-    [schuldnerverwaltungList, extraSchuldnerverwaltung],
+  // record to the local `extraDebitor` list, and select it in
+  // the originating Combobox via the captured `createDebitorField`.
+  const [createDebitorOpen, setCreateDebitorOpen] = useState(false);
+  const [createDebitorInitial, setCreateDebitorInitial] = useState('');
+  const [createDebitorField, setCreateDebitorField] = useState<string>('');
+  const [extraDebitor, setExtraDebitor] = useState< Debitor[]>([]);
+  const debitorListAll = useMemo(
+    () => [...debitorList, ...extraDebitor],
+    [debitorList, extraDebitor],
   );
-  function openCreateSchuldnerverwaltung(fieldKey: string, q: string) {
-    setCreateSchuldnerverwaltungField(fieldKey);
-    setCreateSchuldnerverwaltungInitial(q);
-    setCreateSchuldnerverwaltungOpen(true);
+  function openCreateDebitor(fieldKey: string, q: string) {
+    setCreateDebitorField(fieldKey);
+    setCreateDebitorInitial(q);
+    setCreateDebitorOpen(true);
   }
+  const [showErrors, setShowErrors] = useState(false);
+  const REQUIRED_FIELDS = ['rechnungsnummer', 'rechnungsdatum', 'faelligkeitsdatum', 'rechnungsbetrag', 'zahlungsstatus', 'schuldner'] as const;
+  const missingRequired = REQUIRED_FIELDS.filter(k => {
+    const v = (fields as Record<string, unknown>)[k];
+    return v == null || v === '' || (Array.isArray(v) && v.length === 0);
+  });
   const [aiOpen, setAiOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
@@ -87,9 +126,9 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
   // operands can resolve to numeric fields on the target record.
   const computedContext = useMemo<ComputedContext>(() => ({
     lookupLists: {
-      'schuldner': schuldnerverwaltungList,
+      'schuldner': debitorList,
     },
-  }), [schuldnerverwaltungList, ]);
+  }), [debitorList, ]);
   const computedValues = useMemo<Record<string, number | null>>(() => {
     let out: Record<string, number | null> = {};
     const entries = Object.entries(formEnhancements.computed);
@@ -115,12 +154,13 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
 
   useEffect(() => {
     if (open) {
-      setFields(applyDefaults((defaultValues ?? {}) as Record<string, unknown>, formEnhancements.defaults) as Partial<Forderungserfassung['fields']>);
+      setFields(applyDefaults(normalizedDefaults ?? {}, formEnhancements.defaults) as Partial<Forderungserfassung['fields']>);
       setPreview(null);
       setScanSuccess(false);
       setAiText('');
+      setSubmitError(null);
     }
-  }, [open, defaultValues]);
+  }, [open, normalizedDefaults]);
   useEffect(() => {
     try { localStorage.setItem('ai-use-personal-info', String(usePersonalInfo)); } catch {}
   }, [usePersonalInfo]);
@@ -138,9 +178,20 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
     }
   }
 
+  // Submit errors surface IN the dialog (it is modal — a banner in the page
+  // body would be hidden behind it). A consumer onSubmit that THROWS (the
+  // documented "throw to prevent closing" validation pattern) lands here:
+  // the dialog stays open, nothing is saved, the message is visible.
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (missingRequired.length > 0) {
+      setShowErrors(true);
+      return;
+    }
     setSaving(true);
+    setSubmitError(null);
     try {
       // Fill empty number slots from computed values; user-typed values always win.
       // CRITICAL: only backend-mapped keys may be backfilled. Virtual computeds
@@ -159,6 +210,8 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
       const clean = cleanFieldsForApi(merged, 'forderungserfassung');
       await onSubmit(clean as Forderungserfassung['fields']);
       onClose();
+    } catch (err) {
+      setSubmitError(err instanceof Error && err.message ? err.message : 'Speichern fehlgeschlagen.');
     } finally {
       setSaving(false);
     }
@@ -191,7 +244,7 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
       if (parts.length) {
         contextParts.push(`<photo-metadata>\nThe following metadata was extracted from the photo\'s EXIF data:\n${parts.join('\n')}\n</photo-metadata>`);
       }
-      contextParts.push(`<available-records field="schuldner" entity="Schuldnerverwaltung">\n${JSON.stringify(schuldnerverwaltungList.map(r => ({ record_id: r.record_id, ...r.fields })), null, 2)}\n</available-records>`);
+      contextParts.push(`<available-records field="schuldner" entity="Debitor">\n${JSON.stringify(debitorList.map(r => ({ record_id: r.record_id, ...r.fields })), null, 2)}\n</available-records>`);
       if (usePersonalInfo) {
         try {
           const profile = await getUserProfile();
@@ -201,7 +254,7 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
         }
       }
       const photoContext = contextParts.length ? contextParts.join('\n') : undefined;
-      const schema = `{\n  "rechnungsnummer": string | null, // Rechnungsnummer\n  "rechnungsdatum": string | null, // YYYY-MM-DD\n  "faelligkeitsdatum": string | null, // YYYY-MM-DD\n  "rechnungsbetrag": number | null, // Rechnungsbetrag (€)\n  "gezahlter_betrag": number | null, // Bereits gezahlter Betrag (€)\n  "zahlungsstatus": LookupValue | null, // Zahlungsstatus (select one key: "offen" | "teilweise_bezahlt" | "vollstaendig_bezahlt" | "ueberzahlt") mapping: offen=Offen, teilweise_bezahlt=Teilweise bezahlt, vollstaendig_bezahlt=Vollständig bezahlt, ueberzahlt=Überzahlt\n  "schuldner": string | null, // Display name from Schuldnerverwaltung (see <available-records>)\n  "notizen_forderung": string | null, // Notizen zur Forderung\n}`;
+      const schema = `{\n  "rechnungsnummer": string | null, // Rechnungsnummer\n  "rechnungsdatum": string | null, // YYYY-MM-DD\n  "faelligkeitsdatum": string | null, // YYYY-MM-DD\n  "rechnungsbetrag": number | null, // Rechnungsbetrag (€)\n  "gezahlter_betrag": number | null, // Bereits gezahlter Betrag (€)\n  "zahlungsstatus": LookupValue | null, // Zahlungsstatus (select one key: "offen" | "teilweise_bezahlt" | "vollstaendig_bezahlt" | "ueberzahlt") mapping: offen=Offen, teilweise_bezahlt=Teilweise bezahlt, vollstaendig_bezahlt=Vollständig bezahlt, ueberzahlt=Überzahlt\n  "schuldner": string | null, // Display name from Debitor (see <available-records>)\n  "notizen_forderung": string | null, // Notizen zur Forderung\n}`;
       const raw = await extractFromInput<Record<string, unknown>>(schema, {
         dataUri: uri,
         userText: aiText.trim() || undefined,
@@ -221,8 +274,8 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
         }
         const schuldnerName = raw['schuldner'] as string | null;
         if (schuldnerName) {
-          const schuldnerMatch = schuldnerverwaltungList.find(r => matchName(schuldnerName!, [String(r.fields.kundennummer ?? '')]));
-          if (schuldnerMatch) merged['schuldner'] = createRecordUrl(APP_IDS.SCHULDNERVERWALTUNG, schuldnerMatch.record_id);
+          const schuldnerMatch = debitorList.find(r => matchName(schuldnerName!, [String(r.fields.kundennummer ?? '')]));
+          if (schuldnerMatch) merged['schuldner'] = createRecordUrl(APP_IDS.DEBITOR, schuldnerMatch.record_id);
         }
         return merged as Partial<Forderungserfassung['fields']>;
       });
@@ -280,51 +333,66 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
   const fieldBlocks: Record<string, React.ReactNode> = {
     'rechnungsnummer': (
       <div key="rechnungsnummer" className="space-y-1.5">
-        <Label htmlFor="rechnungsnummer">Rechnungsnummer</Label>
+        <Label htmlFor="rechnungsnummer">Rechnungsnummer <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Input
           id="rechnungsnummer"
-          placeholder="z. B. RE-2026-001"
+          placeholder=""
           value={fields.rechnungsnummer ?? ''}
           onChange={e => setFields(f => ({ ...f, rechnungsnummer: e.target.value }))}
+          required
         />
+        {showErrors && !fields.rechnungsnummer && (
+          <p className="text-xs text-destructive mt-1">Pflichtfeld</p>
+        )}
       </div>
     ),
     'rechnungsdatum': (
       <div key="rechnungsdatum" className="space-y-1.5">
-        <Label htmlFor="rechnungsdatum">Rechnungsdatum</Label>
+        <Label htmlFor="rechnungsdatum">Rechnungsdatum <span className="text-destructive" aria-hidden="true">*</span></Label>
         <DatePicker
           id="rechnungsdatum"
-          placeholder="Wann wurde die Rechnung gestellt?"
+          placeholder=""
           mode="date"
           value={fields.rechnungsdatum ?? null}
           onChange={v => setFields(f => ({ ...f, rechnungsdatum: v ?? undefined }))}
+          required
         />
+        {showErrors && !fields.rechnungsdatum && (
+          <p className="text-xs text-destructive mt-1">Pflichtfeld</p>
+        )}
       </div>
     ),
     'faelligkeitsdatum': (
       <div key="faelligkeitsdatum" className="space-y-1.5">
-        <Label htmlFor="faelligkeitsdatum">Fälligkeitsdatum</Label>
+        <Label htmlFor="faelligkeitsdatum">Fälligkeitsdatum <span className="text-destructive" aria-hidden="true">*</span></Label>
         <DatePicker
           id="faelligkeitsdatum"
-          placeholder="Wann ist die Zahlung fällig?"
+          placeholder=""
           mode="date"
           value={fields.faelligkeitsdatum ?? null}
           onChange={v => setFields(f => ({ ...f, faelligkeitsdatum: v ?? undefined }))}
+          required
         />
+        {showErrors && !fields.faelligkeitsdatum && (
+          <p className="text-xs text-destructive mt-1">Pflichtfeld</p>
+        )}
       </div>
     ),
     'rechnungsbetrag': (
       <div key="rechnungsbetrag" className="space-y-1.5">
-        <Label htmlFor="rechnungsbetrag">Rechnungsbetrag (€)</Label>
+        <Label htmlFor="rechnungsbetrag">Rechnungsbetrag (€) <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Input
           id="rechnungsbetrag"
           type="number"
           step="any"
           {...numberInputProps(formEnhancements, 'rechnungsbetrag')}
-          placeholder="z. B. 1.000,00"
+          placeholder=""
           value={fields.rechnungsbetrag !== undefined ? fields.rechnungsbetrag : (computedValues['rechnungsbetrag'] ?? '')}
           onChange={e => setFields(f => ({ ...f, rechnungsbetrag: clampNumberValue(formEnhancements, 'rechnungsbetrag', e.target.value) }))}
         />
+        {showErrors && !fields.rechnungsbetrag && (
+          <p className="text-xs text-destructive mt-1">Pflichtfeld</p>
+        )}
       </div>
     ),
     'gezahlter_betrag': (
@@ -335,7 +403,7 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
           type="number"
           step="any"
           {...numberInputProps(formEnhancements, 'gezahlter_betrag')}
-          placeholder="z. B. 500,00"
+          placeholder=""
           value={fields.gezahlter_betrag !== undefined ? fields.gezahlter_betrag : (computedValues['gezahlter_betrag'] ?? '')}
           onChange={e => setFields(f => ({ ...f, gezahlter_betrag: clampNumberValue(formEnhancements, 'gezahlter_betrag', e.target.value) }))}
         />
@@ -343,14 +411,14 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
     ),
     'zahlungsstatus': (
       <div key="zahlungsstatus" className="space-y-1.5">
-        <Label htmlFor="zahlungsstatus">Zahlungsstatus</Label>
+        <Label htmlFor="zahlungsstatus">Zahlungsstatus <span className="text-destructive" aria-hidden="true">*</span></Label>
         <div role="radiogroup" className="flex flex-wrap gap-1.5">
           <button
             type="button"
             role="radio"
             aria-checked={lookupKey(fields.zahlungsstatus) === 'offen'}
             onClick={() => setFields(f => ({ ...f, zahlungsstatus: (lookupKey(f.zahlungsstatus) === 'offen' ? undefined : 'offen') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.zahlungsstatus) === 'offen'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -363,7 +431,7 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
             role="radio"
             aria-checked={lookupKey(fields.zahlungsstatus) === 'teilweise_bezahlt'}
             onClick={() => setFields(f => ({ ...f, zahlungsstatus: (lookupKey(f.zahlungsstatus) === 'teilweise_bezahlt' ? undefined : 'teilweise_bezahlt') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.zahlungsstatus) === 'teilweise_bezahlt'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -376,7 +444,7 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
             role="radio"
             aria-checked={lookupKey(fields.zahlungsstatus) === 'vollstaendig_bezahlt'}
             onClick={() => setFields(f => ({ ...f, zahlungsstatus: (lookupKey(f.zahlungsstatus) === 'vollstaendig_bezahlt' ? undefined : 'vollstaendig_bezahlt') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.zahlungsstatus) === 'vollstaendig_bezahlt'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -389,7 +457,7 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
             role="radio"
             aria-checked={lookupKey(fields.zahlungsstatus) === 'ueberzahlt'}
             onClick={() => setFields(f => ({ ...f, zahlungsstatus: (lookupKey(f.zahlungsstatus) === 'ueberzahlt' ? undefined : 'ueberzahlt') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.zahlungsstatus) === 'ueberzahlt'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -398,25 +466,31 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
             Überzahlt
           </button>
         </div>
+        {showErrors && !fields.zahlungsstatus && (
+          <p className="text-xs text-destructive mt-1">Pflichtfeld</p>
+        )}
       </div>
     ),
     'schuldner': (
       <div key="schuldner" className="space-y-1.5">
-        <Label htmlFor="schuldner">Schuldner</Label>
+        <Label htmlFor="schuldner">Schuldner <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Combobox
           id="schuldner"
-          placeholder="Welcher Schuldner?"
-          items={schuldnerverwaltungListAll.map(r => ({
+          placeholder=""
+          items={debitorListAll.map(r => ({
             id: r.record_id,
             label: String(r.fields.kundennummer ?? r.record_id),
           }))}
           value={extractRecordId(fields.schuldner)}
-          onChange={id => setFields(f => ({ ...f, schuldner: id ? createRecordUrl(APP_IDS.SCHULDNERVERWALTUNG, id) : undefined }))}
+          onChange={id => setFields(f => ({ ...f, schuldner: id ? createRecordUrl(APP_IDS.DEBITOR, id) : undefined }))}
           searchPlaceholder="Suchen…"
           emptyText="Kein Treffer"
-          onCreateNew={(q) => openCreateSchuldnerverwaltung("schuldner", q)}
-          createLabel="Neu in Schuldnerverwaltung"
+          onCreateNew={(q) => openCreateDebitor("schuldner", q)}
+          createLabel="Neu in Debitor"
         />
+        {showErrors && !fields.schuldner && (
+          <p className="text-xs text-destructive mt-1">Pflichtfeld</p>
+        )}
       </div>
     ),
     'notizen_forderung': (
@@ -424,7 +498,7 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
         <Label htmlFor="notizen_forderung">Notizen zur Forderung</Label>
         <Textarea
           id="notizen_forderung"
-          placeholder="Zahlungsverlauf, Besonderheiten, Mahnungen..."
+          placeholder=""
           value={fields.notizen_forderung ?? ''}
           onChange={e => setFields(f => ({ ...f, notizen_forderung: e.target.value }))}
           rows={3}
@@ -578,7 +652,7 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
   return (
     <>
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[92vh] flex flex-col overflow-hidden p-0 gap-0">
+      <DialogContent className="max-w-lg max-h-[92vh] flex flex-col overflow-hidden p-0 gap-0 max-sm:[&>button]:size-10 max-sm:[&>button]:grid max-sm:[&>button]:place-items-center max-sm:[&>button]:rounded-full max-sm:[&>button]:border max-sm:[&>button]:border-input max-sm:[&>button]:bg-background max-sm:[&>button]:opacity-100 max-sm:[&>button>svg]:size-5">
         <DialogHeader className="px-6 pt-5 pb-3 border-b flex flex-row items-center gap-3 space-y-0">
           <DialogTitle className="flex-1 truncate text-left">{DIALOG_INTENT}</DialogTitle>
           {enablePhotoScan && (
@@ -587,7 +661,7 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
               onClick={() => setAiOpen(o => !o)}
               aria-expanded={aiOpen}
               aria-controls="ai-fill-panel"
-              className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all mr-7 shadow-sm ${
+              className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 max-sm:py-2.5 max-sm:px-4 text-xs font-semibold transition-all mr-7 max-sm:mr-12 shadow-sm ${
                 aiOpen
                   ? 'bg-primary text-primary-foreground ring-2 ring-primary/30'
                   : 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15 hover:border-primary/50'
@@ -769,7 +843,7 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-1 flex-col min-h-0 min-w-0">
+        <form onSubmit={handleSubmit} className="flex flex-1 flex-col min-h-0 min-w-0 max-sm:[&_input]:h-11">
           <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-4 space-y-4 min-w-0">
             {(() => {
               const renderField = (k: string) => {
@@ -855,17 +929,30 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
                 })()}
               </div>
             )}
+            {showErrors && missingRequired.length > 0 && (
+              <p className="text-xs text-destructive flex items-center gap-1.5" role="alert">
+                <IconAlertCircle className="h-3.5 w-3.5 shrink-0" />
+                Bitte fülle die markierten Pflichtfelder aus.
+              </p>
+            )}
             {recordId && (
               <div className="pt-2 border-t border-border">
                 <AttachmentsSection appId={APP_IDS.FORDERUNGSERFASSUNG} recordId={recordId} />
               </div>
             )}
           </div>
-          <DialogFooter className="sticky bottom-0 border-t bg-background/95 backdrop-blur px-6 py-3 gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>Abbrechen</Button>
+          {submitError && (
+            <div className="flex items-start gap-2 border-t border-destructive/20 bg-destructive/10 px-6 py-2.5 text-sm text-destructive" role="alert">
+              <IconAlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span className="min-w-0 break-words">{submitError}</span>
+            </div>
+          )}
+          <DialogFooter className="sticky bottom-0 border-t bg-background/95 backdrop-blur px-6 py-3 gap-2 max-sm:flex-row">
+            <Button type="button" variant="outline" onClick={onClose} className="max-sm:h-12 max-sm:flex-1 max-sm:text-base">Abbrechen</Button>
             <Button
               type="submit"
-              disabled={saving || !isDirty}
+              className="max-sm:h-12 max-sm:flex-1 max-sm:text-base"
+              disabled={saving || !isDirty || (showErrors && missingRequired.length > 0)}
             >
               {saving ? 'Speichern...' : defaultValues ? 'Speichern' : 'Erstellen'}
             </Button>
@@ -873,22 +960,22 @@ export function ForderungserfassungDialog({ open, onClose, onSubmit, defaultValu
         </form>
       </DialogContent>
     </Dialog>
-    {createSchuldnerverwaltungOpen && (
-      <SchuldnerverwaltungDialog
-        open={createSchuldnerverwaltungOpen}
-        onClose={() => setCreateSchuldnerverwaltungOpen(false)}
+    {createDebitorOpen && (
+      <DebitorDialog
+        open={createDebitorOpen}
+        onClose={() => setCreateDebitorOpen(false)}
         onSubmit={async (newFields) => {
-          const result = await LivingAppsService.createSchuldnerverwaltungEntry(newFields as any) as { id?: string };
+          const result = await LivingAppsService.createDebitorEntry(newFields as any) as { id?: string };
           if (result?.id) {
-            const newRec = { record_id: result.id, fields: newFields } as unknown as Schuldnerverwaltung;
-            setExtraSchuldnerverwaltung(prev => [...prev, newRec]);
-            const url = createRecordUrl(APP_IDS.SCHULDNERVERWALTUNG, result.id);
-            setFields(prev => ({ ...prev, [createSchuldnerverwaltungField]: url } as any));
+            const newRec = { record_id: result.id, fields: newFields } as unknown as Debitor;
+            setExtraDebitor(prev => [...prev, newRec]);
+            const url = createRecordUrl(APP_IDS.DEBITOR, result.id);
+            setFields(prev => ({ ...prev, [createDebitorField]: url } as any));
           }
-          setCreateSchuldnerverwaltungOpen(false);
+          setCreateDebitorOpen(false);
         }}
-        defaultValues={createSchuldnerverwaltungInitial
-          ? ({ kundennummer: createSchuldnerverwaltungInitial } as any)
+        defaultValues={createDebitorInitial
+          ? ({ kundennummer: createDebitorInitial } as any)
           : undefined}
       />
     )}

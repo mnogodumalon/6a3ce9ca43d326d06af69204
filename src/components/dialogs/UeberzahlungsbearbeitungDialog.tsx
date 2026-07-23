@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { Ueberzahlungsbearbeitung, Forderungserfassung } from '@/types/app';
-import { APP_IDS } from '@/types/app';
+import type { Ueberzahlungsbearbeitung, Forderungserfassung, LookupValue } from '@/types/app';
+import { APP_IDS, LOOKUP_OPTIONS } from '@/types/app';
 import { extractRecordId, createRecordUrl, cleanFieldsForApi, uploadFile, getUserProfile, LivingAppsService } from '@/services/livingAppsService';
 import {
   Dialog, DialogContent, DialogHeader,
@@ -18,7 +18,7 @@ import { Combobox } from '@/components/Combobox';
 import { ForderungserfassungDialog } from '@/components/dialogs/ForderungserfassungDialog';
 import { DatePicker } from '@/components/DatePicker';
 import { Checkbox } from '@/components/ui/checkbox';
-import { IconCamera, IconChevronDown, IconCircleCheck, IconClipboard, IconFileText, IconLoader2, IconPhotoPlus, IconSparkles, IconUpload, IconX } from '@tabler/icons-react';
+import { IconAlertCircle, IconCamera, IconChevronDown, IconCircleCheck, IconClipboard, IconFileText, IconLoader2, IconPhotoPlus, IconSparkles, IconUpload, IconX } from '@tabler/icons-react';
 import { fileToDataUri, extractFromInput, extractPhotoMeta, reverseGeocode, dataUriToBlob } from '@/lib/ai';
 import { lookupKey } from '@/lib/formatters';
 
@@ -26,7 +26,13 @@ interface UeberzahlungsbearbeitungDialogProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (fields: Ueberzahlungsbearbeitung['fields']) => Promise<void>;
-  defaultValues?: Ueberzahlungsbearbeitung['fields'];
+  /** SHAPE-TOLERANT: lookup fields accept the bare key (string) or the
+   *  LookupValue object; applookup fields the bare record id or the full
+   *  record URL — the dialog normalizes both. */
+  defaultValues?: Omit<Ueberzahlungsbearbeitung['fields'], 'massnahme' | 'bearbeitungsstatus'> & {
+    massnahme?: LookupValue | string;
+    bearbeitungsstatus?: LookupValue | string;
+  };
   /** Record id when editing — enables the attachments section. Omit on create. */
   recordId?: string;
   forderungserfassungList: Forderungserfassung[];
@@ -34,20 +40,49 @@ interface UeberzahlungsbearbeitungDialogProps {
   enablePhotoLocation?: boolean;
 }
 
+// defaultValues are SHAPE-TOLERANT: the dialog resolves bare lookup keys via
+// its own options and bare record ids via the field's target app — consumers
+// never carry the LookupValue/record-URL shape in their head.
+const NORMALIZE_LOOKUPS: Record<string, readonly { key: string; label: string }[]> = {
+  massnahme: LOOKUP_OPTIONS['ueberzahlungsbearbeitung']?.['massnahme'] ?? [],
+  bearbeitungsstatus: LOOKUP_OPTIONS['ueberzahlungsbearbeitung']?.['bearbeitungsstatus'] ?? [],
+};
+const NORMALIZE_APPLOOKUPS: Record<string, string> = {
+  forderung: APP_IDS.FORDERUNGSERFASSUNG,
+};
+function normalizeDefaults(values: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...values };
+  for (const [k, opts] of Object.entries(NORMALIZE_LOOKUPS)) {
+    const v = out[k];
+    if (typeof v === 'string') out[k] = opts.find(o => o.key === v) ?? { key: v, label: v };
+    else if (Array.isArray(v)) out[k] = v.map(x => (typeof x === 'string' ? opts.find(o => o.key === x) ?? { key: x, label: x } : x));
+  }
+  for (const [k, appId] of Object.entries(NORMALIZE_APPLOOKUPS)) {
+    const v = out[k];
+    if (typeof v === 'string' && v !== '' && !v.startsWith('http')) out[k] = createRecordUrl(appId, v);
+    else if (Array.isArray(v)) out[k] = v.map(x => (typeof x === 'string' && x !== '' && !x.startsWith('http') ? createRecordUrl(appId, x) : x));
+  }
+  return out;
+}
+
 export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaultValues, recordId, forderungserfassungList, enablePhotoScan = true, enablePhotoLocation = true }: UeberzahlungsbearbeitungDialogProps) {
   const [fields, setFields] = useState<Partial<Ueberzahlungsbearbeitung['fields']>>({});
   const [saving, setSaving] = useState(false);
+  const normalizedDefaults = useMemo<Record<string, unknown> | undefined>(
+    () => (defaultValues ? normalizeDefaults(defaultValues as Record<string, unknown>) : undefined),
+    [defaultValues],
+  );
   // Dirty-tracking: in edit-mode the Speichern button is disabled until the
   // user actually changes something. JSON.stringify is good enough for our
   // fields (plain values + LookupValue objects + string arrays).
   const isDirty = useMemo(() => {
-    if (!defaultValues) return true;  // create-mode: always allow submit
+    if (!normalizedDefaults) return true;  // create-mode: always allow submit
     try {
-      return JSON.stringify(fields) !== JSON.stringify(defaultValues);
+      return JSON.stringify(fields) !== JSON.stringify(normalizedDefaults);
     } catch {
       return true;
     }
-  }, [fields, defaultValues]);
+  }, [fields, normalizedDefaults]);
   // Inline-Create state for "Forderungserfassung" target. The dropdown's
   // "+ Neuer …" option opens a sub-dialog; on submit we POST, add the new
   // record to the local `extraForderungserfassung` list, and select it in
@@ -65,6 +100,12 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
     setCreateForderungserfassungInitial(q);
     setCreateForderungserfassungOpen(true);
   }
+  const [showErrors, setShowErrors] = useState(false);
+  const REQUIRED_FIELDS = ['forderung', 'ueberzahlter_betrag', 'massnahme', 'bearbeitungsstatus'] as const;
+  const missingRequired = REQUIRED_FIELDS.filter(k => {
+    const v = (fields as Record<string, unknown>)[k];
+    return v == null || v === '' || (Array.isArray(v) && v.length === 0);
+  });
   const [aiOpen, setAiOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
@@ -115,12 +156,13 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
 
   useEffect(() => {
     if (open) {
-      setFields(applyDefaults((defaultValues ?? {}) as Record<string, unknown>, formEnhancements.defaults) as Partial<Ueberzahlungsbearbeitung['fields']>);
+      setFields(applyDefaults(normalizedDefaults ?? {}, formEnhancements.defaults) as Partial<Ueberzahlungsbearbeitung['fields']>);
       setPreview(null);
       setScanSuccess(false);
       setAiText('');
+      setSubmitError(null);
     }
-  }, [open, defaultValues]);
+  }, [open, normalizedDefaults]);
   useEffect(() => {
     try { localStorage.setItem('ai-use-personal-info', String(usePersonalInfo)); } catch {}
   }, [usePersonalInfo]);
@@ -138,9 +180,20 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
     }
   }
 
+  // Submit errors surface IN the dialog (it is modal — a banner in the page
+  // body would be hidden behind it). A consumer onSubmit that THROWS (the
+  // documented "throw to prevent closing" validation pattern) lands here:
+  // the dialog stays open, nothing is saved, the message is visible.
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (missingRequired.length > 0) {
+      setShowErrors(true);
+      return;
+    }
     setSaving(true);
+    setSubmitError(null);
     try {
       // Fill empty number slots from computed values; user-typed values always win.
       // CRITICAL: only backend-mapped keys may be backfilled. Virtual computeds
@@ -159,6 +212,8 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
       const clean = cleanFieldsForApi(merged, 'ueberzahlungsbearbeitung');
       await onSubmit(clean as Ueberzahlungsbearbeitung['fields']);
       onClose();
+    } catch (err) {
+      setSubmitError(err instanceof Error && err.message ? err.message : 'Speichern fehlgeschlagen.');
     } finally {
       setSaving(false);
     }
@@ -280,10 +335,10 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
   const fieldBlocks: Record<string, React.ReactNode> = {
     'forderung': (
       <div key="forderung" className="space-y-1.5">
-        <Label htmlFor="forderung">Forderung</Label>
+        <Label htmlFor="forderung">Forderung <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Combobox
           id="forderung"
-          placeholder="Welche Forderung betroffen?"
+          placeholder=""
           items={forderungserfassungListAll.map(r => ({
             id: r.record_id,
             label: String(r.fields.rechnungsnummer ?? r.record_id),
@@ -295,20 +350,26 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
           onCreateNew={(q) => openCreateForderungserfassung("forderung", q)}
           createLabel="Neu in Forderungserfassung"
         />
+        {showErrors && !fields.forderung && (
+          <p className="text-xs text-destructive mt-1">Pflichtfeld</p>
+        )}
       </div>
     ),
     'ueberzahlter_betrag': (
       <div key="ueberzahlter_betrag" className="space-y-1.5">
-        <Label htmlFor="ueberzahlter_betrag">Überzahlter Betrag (€)</Label>
+        <Label htmlFor="ueberzahlter_betrag">Überzahlter Betrag (€) <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Input
           id="ueberzahlter_betrag"
           type="number"
           step="any"
           {...numberInputProps(formEnhancements, 'ueberzahlter_betrag')}
-          placeholder="z. B. 50,00"
+          placeholder=""
           value={fields.ueberzahlter_betrag !== undefined ? fields.ueberzahlter_betrag : (computedValues['ueberzahlter_betrag'] ?? '')}
           onChange={e => setFields(f => ({ ...f, ueberzahlter_betrag: clampNumberValue(formEnhancements, 'ueberzahlter_betrag', e.target.value) }))}
         />
+        {showErrors && !fields.ueberzahlter_betrag && (
+          <p className="text-xs text-destructive mt-1">Pflichtfeld</p>
+        )}
       </div>
     ),
     'eingangsdatum_zahlung': (
@@ -316,7 +377,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
         <Label htmlFor="eingangsdatum_zahlung">Eingangsdatum der Zahlung</Label>
         <DatePicker
           id="eingangsdatum_zahlung"
-          placeholder="Wann kam die Zahlung an?"
+          placeholder=""
           mode="date"
           value={fields.eingangsdatum_zahlung ?? null}
           onChange={v => setFields(f => ({ ...f, eingangsdatum_zahlung: v ?? undefined }))}
@@ -325,14 +386,14 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
     ),
     'massnahme': (
       <div key="massnahme" className="space-y-1.5">
-        <Label htmlFor="massnahme">Maßnahme</Label>
+        <Label htmlFor="massnahme">Maßnahme <span className="text-destructive" aria-hidden="true">*</span></Label>
         <div role="radiogroup" className="flex flex-wrap gap-1.5">
           <button
             type="button"
             role="radio"
             aria-checked={lookupKey(fields.massnahme) === 'rueckerstattung'}
             onClick={() => setFields(f => ({ ...f, massnahme: (lookupKey(f.massnahme) === 'rueckerstattung' ? undefined : 'rueckerstattung') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.massnahme) === 'rueckerstattung'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -345,7 +406,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
             role="radio"
             aria-checked={lookupKey(fields.massnahme) === 'verrechnung'}
             onClick={() => setFields(f => ({ ...f, massnahme: (lookupKey(f.massnahme) === 'verrechnung' ? undefined : 'verrechnung') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.massnahme) === 'verrechnung'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -358,7 +419,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
             role="radio"
             aria-checked={lookupKey(fields.massnahme) === 'gutschrift'}
             onClick={() => setFields(f => ({ ...f, massnahme: (lookupKey(f.massnahme) === 'gutschrift' ? undefined : 'gutschrift') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.massnahme) === 'gutschrift'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -371,7 +432,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
             role="radio"
             aria-checked={lookupKey(fields.massnahme) === 'sonstiges'}
             onClick={() => setFields(f => ({ ...f, massnahme: (lookupKey(f.massnahme) === 'sonstiges' ? undefined : 'sonstiges') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.massnahme) === 'sonstiges'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -380,18 +441,21 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
             Sonstiges
           </button>
         </div>
+        {showErrors && !fields.massnahme && (
+          <p className="text-xs text-destructive mt-1">Pflichtfeld</p>
+        )}
       </div>
     ),
     'bearbeitungsstatus': (
       <div key="bearbeitungsstatus" className="space-y-1.5">
-        <Label htmlFor="bearbeitungsstatus">Bearbeitungsstatus</Label>
+        <Label htmlFor="bearbeitungsstatus">Bearbeitungsstatus <span className="text-destructive" aria-hidden="true">*</span></Label>
         <div role="radiogroup" className="flex flex-wrap gap-1.5">
           <button
             type="button"
             role="radio"
             aria-checked={lookupKey(fields.bearbeitungsstatus) === 'offen'}
             onClick={() => setFields(f => ({ ...f, bearbeitungsstatus: (lookupKey(f.bearbeitungsstatus) === 'offen' ? undefined : 'offen') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.bearbeitungsstatus) === 'offen'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -404,7 +468,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
             role="radio"
             aria-checked={lookupKey(fields.bearbeitungsstatus) === 'in_bearbeitung'}
             onClick={() => setFields(f => ({ ...f, bearbeitungsstatus: (lookupKey(f.bearbeitungsstatus) === 'in_bearbeitung' ? undefined : 'in_bearbeitung') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.bearbeitungsstatus) === 'in_bearbeitung'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -417,7 +481,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
             role="radio"
             aria-checked={lookupKey(fields.bearbeitungsstatus) === 'abgeschlossen'}
             onClick={() => setFields(f => ({ ...f, bearbeitungsstatus: (lookupKey(f.bearbeitungsstatus) === 'abgeschlossen' ? undefined : 'abgeschlossen') as any }))}
-            className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
               lookupKey(fields.bearbeitungsstatus) === 'abgeschlossen'
                 ? 'bg-foreground text-background border-foreground'
                 : 'bg-background text-foreground border-input hover:bg-accent'
@@ -426,6 +490,9 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
             Abgeschlossen
           </button>
         </div>
+        {showErrors && !fields.bearbeitungsstatus && (
+          <p className="text-xs text-destructive mt-1">Pflichtfeld</p>
+        )}
       </div>
     ),
     'bearbeitungsdatum': (
@@ -433,7 +500,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
         <Label htmlFor="bearbeitungsdatum">Bearbeitungsdatum</Label>
         <DatePicker
           id="bearbeitungsdatum"
-          placeholder="Wann abgeschlossen?"
+          placeholder=""
           mode="date"
           value={fields.bearbeitungsdatum ?? null}
           onChange={v => setFields(f => ({ ...f, bearbeitungsdatum: v ?? undefined }))}
@@ -445,7 +512,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
         <Label htmlFor="kontoinhaber_vorname">Kontoinhaber Vorname</Label>
         <Input
           id="kontoinhaber_vorname"
-          placeholder="z. B. Max"
+          placeholder=""
           value={fields.kontoinhaber_vorname ?? ''}
           onChange={e => setFields(f => ({ ...f, kontoinhaber_vorname: e.target.value }))}
         />
@@ -456,7 +523,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
         <Label htmlFor="kontoinhaber_nachname">Kontoinhaber Nachname</Label>
         <Input
           id="kontoinhaber_nachname"
-          placeholder="z. B. Mustermann"
+          placeholder=""
           value={fields.kontoinhaber_nachname ?? ''}
           onChange={e => setFields(f => ({ ...f, kontoinhaber_nachname: e.target.value }))}
         />
@@ -467,7 +534,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
         <Label htmlFor="iban">IBAN</Label>
         <Input
           id="iban"
-          placeholder="z. B. DE89370400440532013000"
+          placeholder=""
           value={fields.iban ?? ''}
           onChange={e => setFields(f => ({ ...f, iban: e.target.value }))}
         />
@@ -478,7 +545,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
         <Label htmlFor="bic">BIC</Label>
         <Input
           id="bic"
-          placeholder="z. B. COBADEFFXXX"
+          placeholder=""
           value={fields.bic ?? ''}
           onChange={e => setFields(f => ({ ...f, bic: e.target.value }))}
         />
@@ -489,7 +556,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
         <Label htmlFor="bank">Kreditinstitut</Label>
         <Input
           id="bank"
-          placeholder="z. B. Commerzbank"
+          placeholder=""
           value={fields.bank ?? ''}
           onChange={e => setFields(f => ({ ...f, bank: e.target.value }))}
         />
@@ -500,7 +567,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
         <Label htmlFor="bemerkungen">Bemerkungen</Label>
         <Textarea
           id="bemerkungen"
-          placeholder="Zusätz. Infos zur Rückzahlung, Status, Kontakt..."
+          placeholder=""
           value={fields.bemerkungen ?? ''}
           onChange={e => setFields(f => ({ ...f, bemerkungen: e.target.value }))}
           rows={3}
@@ -654,7 +721,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
   return (
     <>
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[92vh] flex flex-col overflow-hidden p-0 gap-0">
+      <DialogContent className="max-w-lg max-h-[92vh] flex flex-col overflow-hidden p-0 gap-0 max-sm:[&>button]:size-10 max-sm:[&>button]:grid max-sm:[&>button]:place-items-center max-sm:[&>button]:rounded-full max-sm:[&>button]:border max-sm:[&>button]:border-input max-sm:[&>button]:bg-background max-sm:[&>button]:opacity-100 max-sm:[&>button>svg]:size-5">
         <DialogHeader className="px-6 pt-5 pb-3 border-b flex flex-row items-center gap-3 space-y-0">
           <DialogTitle className="flex-1 truncate text-left">{DIALOG_INTENT}</DialogTitle>
           {enablePhotoScan && (
@@ -663,7 +730,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
               onClick={() => setAiOpen(o => !o)}
               aria-expanded={aiOpen}
               aria-controls="ai-fill-panel"
-              className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all mr-7 shadow-sm ${
+              className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 max-sm:py-2.5 max-sm:px-4 text-xs font-semibold transition-all mr-7 max-sm:mr-12 shadow-sm ${
                 aiOpen
                   ? 'bg-primary text-primary-foreground ring-2 ring-primary/30'
                   : 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15 hover:border-primary/50'
@@ -845,7 +912,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-1 flex-col min-h-0 min-w-0">
+        <form onSubmit={handleSubmit} className="flex flex-1 flex-col min-h-0 min-w-0 max-sm:[&_input]:h-11">
           <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-4 space-y-4 min-w-0">
             {(() => {
               const renderField = (k: string) => {
@@ -931,17 +998,30 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
                 })()}
               </div>
             )}
+            {showErrors && missingRequired.length > 0 && (
+              <p className="text-xs text-destructive flex items-center gap-1.5" role="alert">
+                <IconAlertCircle className="h-3.5 w-3.5 shrink-0" />
+                Bitte fülle die markierten Pflichtfelder aus.
+              </p>
+            )}
             {recordId && (
               <div className="pt-2 border-t border-border">
                 <AttachmentsSection appId={APP_IDS.UEBERZAHLUNGSBEARBEITUNG} recordId={recordId} />
               </div>
             )}
           </div>
-          <DialogFooter className="sticky bottom-0 border-t bg-background/95 backdrop-blur px-6 py-3 gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>Abbrechen</Button>
+          {submitError && (
+            <div className="flex items-start gap-2 border-t border-destructive/20 bg-destructive/10 px-6 py-2.5 text-sm text-destructive" role="alert">
+              <IconAlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span className="min-w-0 break-words">{submitError}</span>
+            </div>
+          )}
+          <DialogFooter className="sticky bottom-0 border-t bg-background/95 backdrop-blur px-6 py-3 gap-2 max-sm:flex-row">
+            <Button type="button" variant="outline" onClick={onClose} className="max-sm:h-12 max-sm:flex-1 max-sm:text-base">Abbrechen</Button>
             <Button
               type="submit"
-              disabled={saving || !isDirty}
+              className="max-sm:h-12 max-sm:flex-1 max-sm:text-base"
+              disabled={saving || !isDirty || (showErrors && missingRequired.length > 0)}
             >
               {saving ? 'Speichern...' : defaultValues ? 'Speichern' : 'Erstellen'}
             </Button>
@@ -966,7 +1046,7 @@ export function UeberzahlungsbearbeitungDialog({ open, onClose, onSubmit, defaul
         defaultValues={createForderungserfassungInitial
           ? ({ rechnungsnummer: createForderungserfassungInitial } as any)
           : undefined}
-        schuldnerverwaltungList={[]}
+        debitorList={[]}
       />
     )}
     </>

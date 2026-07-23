@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { LivingAppsService, extractRecordId } from '@/services/livingAppsService';
-import type { Forderungserfassung, Schuldnerverwaltung } from '@/types/app';
+import type { Forderungserfassung, Debitor } from '@/types/app';
 import { APP_IDS } from '@/types/app';
 import { Button } from '@/components/ui/button';
 import { IconArrowLeft, IconTrash } from '@tabler/icons-react';
@@ -22,18 +22,18 @@ export default function ForderungserfassungDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [schuldnerverwaltungList, setSchuldnerverwaltungList] = useState<Schuldnerverwaltung[]>([]);
+  const [debitorList, setDebitorList] = useState<Debitor[]>([]);
 
   useEffect(() => { loadData(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [id]);
 
   async function loadData() {
     setLoading(true);
     try {
-      const [mainData, schuldnerverwaltungData] = await Promise.all([
+      const [mainData, debitorData] = await Promise.all([
         LivingAppsService.getForderungserfassung(),
-        LivingAppsService.getSchuldnerverwaltung(),
+        LivingAppsService.getDebitor(),
       ]);
-      setSchuldnerverwaltungList(schuldnerverwaltungData);
+      setDebitorList(debitorData);
       setRecord(mainData.find(r => r.record_id === id) ?? null);
     } finally {
       setLoading(false);
@@ -54,10 +54,10 @@ export default function ForderungserfassungDetailPage() {
     navigate('/forderungserfassung');
   }
 
-  function getSchuldnerverwaltungDisplayName(url?: unknown) {
+  function getDebitorDisplayName(url?: unknown) {
     if (!url) return '—';
     const refId = extractRecordId(url);
-    return schuldnerverwaltungList.find(r => r.record_id === refId)?.fields.kundennummer ?? '—';
+    return debitorList.find(r => r.record_id === refId)?.fields.kundennummer ?? '—';
   }
 
   if (loading) {
@@ -89,7 +89,7 @@ export default function ForderungserfassungDetailPage() {
 
       {(() => {
         const lookupLists: Record<string, unknown> = {
-          schuldner: schuldnerverwaltungList,
+          schuldner: debitorList,
         };
         const fmtComputed = (k: string, n: number) =>
           /(?:kosten|preis|betrag|gesamt|netto|brutto|summe|mwst|rabatt|anzahlung|umsatz|saldo)/i.test(k)
@@ -113,7 +113,7 @@ export default function ForderungserfassungDetailPage() {
         <RecordField label="Rechnungsbetrag (€)" value={record.fields.rechnungsbetrag} format="text" />
         <RecordField label="Bereits gezahlter Betrag (€)" value={record.fields.gezahlter_betrag} format="text" />
         <RecordField label="Zahlungsstatus" value={record.fields.zahlungsstatus} format="pill" />
-        <RecordField label="Schuldner" value={getSchuldnerverwaltungDisplayName(record.fields.schuldner)} format="text" />
+        <RecordField label="Schuldner" value={getDebitorDisplayName(record.fields.schuldner)} format="text" />
         <RecordField label="Notizen zur Forderung" value={record.fields.notizen_forderung} format="longtext" className="md:col-span-2" />
       </RecordSection>
 
@@ -132,7 +132,7 @@ export default function ForderungserfassungDetailPage() {
         onSubmit={handleUpdate}
         defaultValues={record.fields}
         recordId={record.record_id}
-        schuldnerverwaltungList={schuldnerverwaltungList}
+        debitorList={debitorList}
         enablePhotoScan={AI_PHOTO_SCAN['Forderungserfassung']}
         enablePhotoLocation={AI_PHOTO_LOCATION['Forderungserfassung']}
       />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { Schuldnerverwaltung } from '@/types/app';
+import type { Debitor as Schuldnerverwaltung } from '@/types/app';
 import { APP_IDS } from '@/types/app';
 import { extractRecordId, createRecordUrl, cleanFieldsForApi, getUserProfile } from '@/services/livingAppsService';
 import {
@@ -134,7 +134,7 @@ export function SchuldnerverwaltungDialog({ open, onClose, onSubmit, defaultValu
           (merged as Record<string, unknown>)[key] = val;
         }
       }
-      const clean = cleanFieldsForApi(merged, 'schuldnerverwaltung');
+      const clean = cleanFieldsForApi(merged, 'debitor');
       await onSubmit(clean as Schuldnerverwaltung['fields']);
       onClose();
     } finally {
@@ -728,7 +728,7 @@ export function SchuldnerverwaltungDialog({ open, onClose, onSubmit, defaultValu
             )}
             {recordId && (
               <div className="pt-2 border-t border-border">
-                <AttachmentsSection appId={APP_IDS.SCHULDNERVERWALTUNG} recordId={recordId} />
+                <AttachmentsSection appId={APP_IDS.DEBITOR} recordId={recordId} />
               </div>
             )}
           </div>

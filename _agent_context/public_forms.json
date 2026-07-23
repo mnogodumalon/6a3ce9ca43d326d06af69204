@@ -2,45 +2,6 @@
   "version": 1,
   "forms": [
     {
-      "entity": "schuldnerverwaltung",
-      "app_id": "6a3ce9ac1cefa9ec46d6187c",
-      "path": "/rest/apps/6a3ce9ac1cefa9ec46d6187c/records",
-      "allowed_fields": [
-        "kundennummer",
-        "schuldner_vorname",
-        "schuldner_nachname",
-        "unternehmen",
-        "letzter_vorgang",
-        "strasse",
-        "hausnummer",
-        "postleitzahl",
-        "ort",
-        "email",
-        "telefon",
-        "notizen_schuldner"
-      ],
-      "pow": true,
-      "pow_difficulty": 50000,
-      "title": "Schuldnerverwaltung — Formular"
-    },
-    {
-      "entity": "forderungserfassung",
-      "app_id": "6a3ce9b3ef6a8494f3a048fe",
-      "path": "/rest/apps/6a3ce9b3ef6a8494f3a048fe/records",
-      "allowed_fields": [
-        "rechnungsnummer",
-        "rechnungsdatum",
-        "faelligkeitsdatum",
-        "rechnungsbetrag",
-        "gezahlter_betrag",
-        "zahlungsstatus",
-        "notizen_forderung"
-      ],
-      "pow": true,
-      "pow_difficulty": 50000,
-      "title": "Forderungserfassung — Formular"
-    },
-    {
       "entity": "ueberzahlungsbearbeitung",
       "app_id": "6a3ce9b4ba6cf5eebd9f2f1b",
       "path": "/rest/apps/6a3ce9b4ba6cf5eebd9f2f1b/records",
@@ -60,6 +21,45 @@
       "pow": true,
       "pow_difficulty": 50000,
       "title": "Überzahlungsbearbeitung — Formular"
+    },
+    {
+      "entity": "forderungserfassung",
+      "app_id": "6a3ce9b3ef6a8494f3a048fe",
+      "path": "/rest/apps/6a3ce9b3ef6a8494f3a048fe/records",
+      "allowed_fields": [
+        "rechnungsnummer",
+        "rechnungsdatum",
+        "faelligkeitsdatum",
+        "rechnungsbetrag",
+        "gezahlter_betrag",
+        "zahlungsstatus",
+        "notizen_forderung"
+      ],
+      "pow": true,
+      "pow_difficulty": 50000,
+      "title": "Forderungserfassung — Formular"
+    },
+    {
+      "entity": "debitor",
+      "app_id": "6a3ce9ac1cefa9ec46d6187c",
+      "path": "/rest/apps/6a3ce9ac1cefa9ec46d6187c/records",
+      "allowed_fields": [
+        "kundennummer",
+        "schuldner_vorname",
+        "schuldner_nachname",
+        "unternehmen",
+        "letzter_vorgang",
+        "strasse",
+        "hausnummer",
+        "postleitzahl",
+        "ort",
+        "email",
+        "telefon",
+        "notizen_schuldner"
+      ],
+      "pow": true,
+      "pow_difficulty": 50000,
+      "title": "Debitor — Formular"
     }
   ]
 }

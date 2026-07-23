@@ -125,7 +125,7 @@ export default function PublicFormUeberzahlungsbearbeitung() {
 
         <form onSubmit={handleSubmit} className="space-y-5 bg-card rounded-xl border border-border p-6 shadow-md">
           <div className="space-y-2">
-            <Label htmlFor="ueberzahlter_betrag">Überzahlter Betrag (€)</Label>
+            <Label htmlFor="ueberzahlter_betrag">Überzahlter Betrag (€) *</Label>
             <Input
               id="ueberzahlter_betrag"
               type="number"
@@ -147,14 +147,14 @@ export default function PublicFormUeberzahlungsbearbeitung() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="massnahme">Maßnahme</Label>
+            <Label htmlFor="massnahme">Maßnahme *</Label>
             <div role="radiogroup" className="flex flex-wrap gap-1.5">
               <button
                 type="button"
                 role="radio"
                 aria-checked={lookupKey(fields.massnahme) === 'rueckerstattung'}
                 onClick={() => setFields(f => ({ ...f, massnahme: (lookupKey(f.massnahme) === 'rueckerstattung' ? undefined : 'rueckerstattung') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.massnahme) === 'rueckerstattung'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'
@@ -167,7 +167,7 @@ export default function PublicFormUeberzahlungsbearbeitung() {
                 role="radio"
                 aria-checked={lookupKey(fields.massnahme) === 'verrechnung'}
                 onClick={() => setFields(f => ({ ...f, massnahme: (lookupKey(f.massnahme) === 'verrechnung' ? undefined : 'verrechnung') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.massnahme) === 'verrechnung'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'
@@ -180,7 +180,7 @@ export default function PublicFormUeberzahlungsbearbeitung() {
                 role="radio"
                 aria-checked={lookupKey(fields.massnahme) === 'gutschrift'}
                 onClick={() => setFields(f => ({ ...f, massnahme: (lookupKey(f.massnahme) === 'gutschrift' ? undefined : 'gutschrift') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.massnahme) === 'gutschrift'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'
@@ -193,7 +193,7 @@ export default function PublicFormUeberzahlungsbearbeitung() {
                 role="radio"
                 aria-checked={lookupKey(fields.massnahme) === 'sonstiges'}
                 onClick={() => setFields(f => ({ ...f, massnahme: (lookupKey(f.massnahme) === 'sonstiges' ? undefined : 'sonstiges') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.massnahme) === 'sonstiges'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'
@@ -204,14 +204,14 @@ export default function PublicFormUeberzahlungsbearbeitung() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="bearbeitungsstatus">Bearbeitungsstatus</Label>
+            <Label htmlFor="bearbeitungsstatus">Bearbeitungsstatus *</Label>
             <div role="radiogroup" className="flex flex-wrap gap-1.5">
               <button
                 type="button"
                 role="radio"
                 aria-checked={lookupKey(fields.bearbeitungsstatus) === 'offen'}
                 onClick={() => setFields(f => ({ ...f, bearbeitungsstatus: (lookupKey(f.bearbeitungsstatus) === 'offen' ? undefined : 'offen') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.bearbeitungsstatus) === 'offen'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'
@@ -224,7 +224,7 @@ export default function PublicFormUeberzahlungsbearbeitung() {
                 role="radio"
                 aria-checked={lookupKey(fields.bearbeitungsstatus) === 'in_bearbeitung'}
                 onClick={() => setFields(f => ({ ...f, bearbeitungsstatus: (lookupKey(f.bearbeitungsstatus) === 'in_bearbeitung' ? undefined : 'in_bearbeitung') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.bearbeitungsstatus) === 'in_bearbeitung'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'
@@ -237,7 +237,7 @@ export default function PublicFormUeberzahlungsbearbeitung() {
                 role="radio"
                 aria-checked={lookupKey(fields.bearbeitungsstatus) === 'abgeschlossen'}
                 onClick={() => setFields(f => ({ ...f, bearbeitungsstatus: (lookupKey(f.bearbeitungsstatus) === 'abgeschlossen' ? undefined : 'abgeschlossen') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.bearbeitungsstatus) === 'abgeschlossen'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'

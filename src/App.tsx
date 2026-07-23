@@ -7,15 +7,15 @@ import { ErrorBusProvider } from '@/components/ErrorBus';
 import { Layout } from '@/components/Layout';
 import DashboardOverview from '@/pages/DashboardOverview';
 import AdminPage from '@/pages/AdminPage';
-import SchuldnerverwaltungPage from '@/pages/SchuldnerverwaltungPage';
-import SchuldnerverwaltungDetailPage from '@/pages/SchuldnerverwaltungDetailPage';
-import ForderungserfassungPage from '@/pages/ForderungserfassungPage';
-import ForderungserfassungDetailPage from '@/pages/ForderungserfassungDetailPage';
 import UeberzahlungsbearbeitungPage from '@/pages/UeberzahlungsbearbeitungPage';
 import UeberzahlungsbearbeitungDetailPage from '@/pages/UeberzahlungsbearbeitungDetailPage';
-import PublicFormSchuldnerverwaltung from '@/pages/public/PublicForm_Schuldnerverwaltung';
-import PublicFormForderungserfassung from '@/pages/public/PublicForm_Forderungserfassung';
+import ForderungserfassungPage from '@/pages/ForderungserfassungPage';
+import ForderungserfassungDetailPage from '@/pages/ForderungserfassungDetailPage';
+import DebitorPage from '@/pages/DebitorPage';
+import DebitorDetailPage from '@/pages/DebitorDetailPage';
 import PublicFormUeberzahlungsbearbeitung from '@/pages/public/PublicForm_Ueberzahlungsbearbeitung';
+import PublicFormForderungserfassung from '@/pages/public/PublicForm_Forderungserfassung';
+import PublicFormDebitor from '@/pages/public/PublicForm_Debitor';
 // <public:imports>
 // </public:imports>
 // <custom:imports>
@@ -30,19 +30,19 @@ export default function App() {
         <HashRouter>
           <ActionsProvider>
             <Routes>
-              <Route path="public/6a3ce9ac1cefa9ec46d6187c" element={<PublicFormSchuldnerverwaltung />} />
-              <Route path="public/6a3ce9b3ef6a8494f3a048fe" element={<PublicFormForderungserfassung />} />
               <Route path="public/6a3ce9b4ba6cf5eebd9f2f1b" element={<PublicFormUeberzahlungsbearbeitung />} />
+              <Route path="public/6a3ce9b3ef6a8494f3a048fe" element={<PublicFormForderungserfassung />} />
+              <Route path="public/6a3ce9ac1cefa9ec46d6187c" element={<PublicFormDebitor />} />
               {/* <public:routes> */}
               {/* </public:routes> */}
               <Route element={<Layout />}>
                 <Route index element={<DashboardOverview />} />
-                <Route path="schuldnerverwaltung" element={<SchuldnerverwaltungPage />} />
-                <Route path="schuldnerverwaltung/:id" element={<SchuldnerverwaltungDetailPage />} />
-                <Route path="forderungserfassung" element={<ForderungserfassungPage />} />
-                <Route path="forderungserfassung/:id" element={<ForderungserfassungDetailPage />} />
                 <Route path="ueberzahlungsbearbeitung" element={<UeberzahlungsbearbeitungPage />} />
                 <Route path="ueberzahlungsbearbeitung/:id" element={<UeberzahlungsbearbeitungDetailPage />} />
+                <Route path="forderungserfassung" element={<ForderungserfassungPage />} />
+                <Route path="forderungserfassung/:id" element={<ForderungserfassungDetailPage />} />
+                <Route path="debitor" element={<DebitorPage />} />
+                <Route path="debitor/:id" element={<DebitorDetailPage />} />
                 <Route path="admin" element={<AdminPage />} />
                 {/* <custom:routes> */}
                 <Route path="intents/forderung-erfassen" element={<Suspense fallback={null}><ForderungErfassenPage /></Suspense>} />

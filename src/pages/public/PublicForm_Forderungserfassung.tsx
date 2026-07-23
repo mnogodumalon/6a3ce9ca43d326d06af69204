@@ -125,36 +125,39 @@ export default function PublicFormForderungserfassung() {
 
         <form onSubmit={handleSubmit} className="space-y-5 bg-card rounded-xl border border-border p-6 shadow-md">
           <div className="space-y-2">
-            <Label htmlFor="rechnungsnummer">Rechnungsnummer</Label>
+            <Label htmlFor="rechnungsnummer">Rechnungsnummer *</Label>
             <Input
               id="rechnungsnummer"
               placeholder=""
               value={fields.rechnungsnummer ?? ''}
               onChange={e => setFields(f => ({ ...f, rechnungsnummer: e.target.value }))}
+              required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="rechnungsdatum">Rechnungsdatum</Label>
+            <Label htmlFor="rechnungsdatum">Rechnungsdatum *</Label>
             <DatePicker
               id="rechnungsdatum"
               placeholder=""
               mode="date"
               value={fields.rechnungsdatum ?? null}
               onChange={v => setFields(f => ({ ...f, rechnungsdatum: v ?? undefined }))}
+              required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="faelligkeitsdatum">Fälligkeitsdatum</Label>
+            <Label htmlFor="faelligkeitsdatum">Fälligkeitsdatum *</Label>
             <DatePicker
               id="faelligkeitsdatum"
               placeholder=""
               mode="date"
               value={fields.faelligkeitsdatum ?? null}
               onChange={v => setFields(f => ({ ...f, faelligkeitsdatum: v ?? undefined }))}
+              required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="rechnungsbetrag">Rechnungsbetrag (€)</Label>
+            <Label htmlFor="rechnungsbetrag">Rechnungsbetrag (€) *</Label>
             <Input
               id="rechnungsbetrag"
               type="number"
@@ -178,14 +181,14 @@ export default function PublicFormForderungserfassung() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="zahlungsstatus">Zahlungsstatus</Label>
+            <Label htmlFor="zahlungsstatus">Zahlungsstatus *</Label>
             <div role="radiogroup" className="flex flex-wrap gap-1.5">
               <button
                 type="button"
                 role="radio"
                 aria-checked={lookupKey(fields.zahlungsstatus) === 'offen'}
                 onClick={() => setFields(f => ({ ...f, zahlungsstatus: (lookupKey(f.zahlungsstatus) === 'offen' ? undefined : 'offen') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.zahlungsstatus) === 'offen'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'
@@ -198,7 +201,7 @@ export default function PublicFormForderungserfassung() {
                 role="radio"
                 aria-checked={lookupKey(fields.zahlungsstatus) === 'teilweise_bezahlt'}
                 onClick={() => setFields(f => ({ ...f, zahlungsstatus: (lookupKey(f.zahlungsstatus) === 'teilweise_bezahlt' ? undefined : 'teilweise_bezahlt') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.zahlungsstatus) === 'teilweise_bezahlt'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'
@@ -211,7 +214,7 @@ export default function PublicFormForderungserfassung() {
                 role="radio"
                 aria-checked={lookupKey(fields.zahlungsstatus) === 'vollstaendig_bezahlt'}
                 onClick={() => setFields(f => ({ ...f, zahlungsstatus: (lookupKey(f.zahlungsstatus) === 'vollstaendig_bezahlt' ? undefined : 'vollstaendig_bezahlt') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.zahlungsstatus) === 'vollstaendig_bezahlt'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'
@@ -224,7 +227,7 @@ export default function PublicFormForderungserfassung() {
                 role="radio"
                 aria-checked={lookupKey(fields.zahlungsstatus) === 'ueberzahlt'}
                 onClick={() => setFields(f => ({ ...f, zahlungsstatus: (lookupKey(f.zahlungsstatus) === 'ueberzahlt' ? undefined : 'ueberzahlt') as any }))}
-                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`inline-flex items-center justify-center min-h-9 max-sm:min-h-11 max-sm:px-4 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                   lookupKey(fields.zahlungsstatus) === 'ueberzahlt'
                     ? 'bg-foreground text-background border-foreground'
                     : 'bg-background text-foreground border-input hover:bg-accent'

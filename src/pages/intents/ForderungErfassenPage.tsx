@@ -5,7 +5,7 @@ import { EntitySelectStep } from '@/components/EntitySelectStep';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { APP_IDS, LOOKUP_OPTIONS } from '@/types/app';
-import type { Schuldnerverwaltung, Forderungserfassung } from '@/types/app';
+import type { Debitor as Schuldnerverwaltung, Forderungserfassung } from '@/types/app';
 import { LivingAppsService, createRecordUrl } from '@/services/livingAppsService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,7 +110,7 @@ function OffenerBetragCard({
 
 export default function ForderungErfassenPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { schuldnerverwaltung, loading, error, fetchAll } = useDashboardData();
+  const { debitor: schuldnerverwaltung, loading, error, fetchAll } = useDashboardData();
 
   // Initialize step from URL
   const urlStep = parseInt(searchParams.get('step') ?? '1', 10);
@@ -179,7 +179,7 @@ export default function ForderungErfassenPage() {
 
     setSubmitting(true);
     try {
-      const schuldnerUrl = createRecordUrl(APP_IDS.SCHULDNERVERWALTUNG, selectedSchuldner.record_id);
+      const schuldnerUrl = createRecordUrl(APP_IDS.DEBITOR, selectedSchuldner.record_id);
 
       const fields = {
         rechnungsnummer: form.rechnungsnummer.trim(),

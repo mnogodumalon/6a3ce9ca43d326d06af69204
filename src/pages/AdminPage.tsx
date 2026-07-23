@@ -1,13 +1,13 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import type { Schuldnerverwaltung, Forderungserfassung, Ueberzahlungsbearbeitung } from '@/types/app';
+import type { Ueberzahlungsbearbeitung, Forderungserfassung, Debitor } from '@/types/app';
 import { LivingAppsService, extractRecordId, cleanFieldsForApi } from '@/services/livingAppsService';
-import { SchuldnerverwaltungDialog } from '@/components/dialogs/SchuldnerverwaltungDialog';
-import { SchuldnerverwaltungViewDialog } from '@/components/dialogs/SchuldnerverwaltungViewDialog';
-import { ForderungserfassungDialog } from '@/components/dialogs/ForderungserfassungDialog';
-import { ForderungserfassungViewDialog } from '@/components/dialogs/ForderungserfassungViewDialog';
 import { UeberzahlungsbearbeitungDialog } from '@/components/dialogs/UeberzahlungsbearbeitungDialog';
 import { UeberzahlungsbearbeitungViewDialog } from '@/components/dialogs/UeberzahlungsbearbeitungViewDialog';
+import { ForderungserfassungDialog } from '@/components/dialogs/ForderungserfassungDialog';
+import { ForderungserfassungViewDialog } from '@/components/dialogs/ForderungserfassungViewDialog';
+import { DebitorDialog } from '@/components/dialogs/DebitorDialog';
+import { DebitorViewDialog } from '@/components/dialogs/DebitorViewDialog';
 import { BulkEditDialog } from '@/components/dialogs/BulkEditDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PageShell } from '@/components/PageShell';
@@ -34,31 +34,6 @@ function fmtDate(d?: string) {
 }
 
 // Field metadata per entity for bulk edit and column filters
-const SCHULDNERVERWALTUNG_FIELDS = [
-  { key: 'kundennummer', label: 'Kundennummer', type: 'string/text' },
-  { key: 'schuldner_vorname', label: 'Vorname', type: 'string/text' },
-  { key: 'schuldner_nachname', label: 'Nachname', type: 'string/text' },
-  { key: 'unternehmen', label: 'Unternehmen', type: 'string/text' },
-  { key: 'letzter_vorgang', label: 'Letzter Vorgang', type: 'date/date' },
-  { key: 'strasse', label: 'Straße', type: 'string/text' },
-  { key: 'hausnummer', label: 'Hausnummer', type: 'string/text' },
-  { key: 'postleitzahl', label: 'Postleitzahl', type: 'string/text' },
-  { key: 'ort', label: 'Ort', type: 'string/text' },
-  { key: 'email', label: 'E-Mail-Adresse', type: 'string/email' },
-  { key: 'telefon', label: 'Telefonnummer', type: 'string/tel' },
-  { key: 'notizen_schuldner', label: 'Notizen', type: 'string/textarea' },
-];
-const FORDERUNGSERFASSUNG_FIELDS = [
-  { key: 'rechnungsnummer', label: 'Rechnungsnummer', type: 'string/text' },
-  { key: 'rechnungsdatum', label: 'Rechnungsdatum', type: 'date/date' },
-  { key: 'faelligkeitsdatum', label: 'Fälligkeitsdatum', type: 'date/date' },
-  { key: 'rechnungsbetrag', label: 'Rechnungsbetrag (€)', type: 'number' },
-  { key: 'gezahlter_betrag', label: 'Bereits gezahlter Betrag (€)', type: 'number' },
-  { key: 'zahlungsstatus', label: 'Zahlungsstatus', type: 'lookup/select', options: [{ key: 'offen', label: 'Offen' }, { key: 'teilweise_bezahlt', label: 'Teilweise bezahlt' }, { key: 'vollstaendig_bezahlt', label: 'Vollständig bezahlt' }, { key: 'ueberzahlt', label: 'Überzahlt' }] },
-  { key: 'schuldner', label: 'Schuldner', type: 'applookup/select', targetEntity: 'schuldnerverwaltung', targetAppId: 'SCHULDNERVERWALTUNG', displayField: 'kundennummer' },
-  { key: 'notizen_forderung', label: 'Notizen zur Forderung', type: 'string/textarea' },
-  { key: 'dokument_rechnung', label: 'Rechnungsdokument', type: 'file' },
-];
 const UEBERZAHLUNGSBEARBEITUNG_FIELDS = [
   { key: 'forderung', label: 'Forderung', type: 'applookup/select', targetEntity: 'forderungserfassung', targetAppId: 'FORDERUNGSERFASSUNG', displayField: 'rechnungsnummer' },
   { key: 'ueberzahlter_betrag', label: 'Überzahlter Betrag (€)', type: 'number' },
@@ -74,11 +49,36 @@ const UEBERZAHLUNGSBEARBEITUNG_FIELDS = [
   { key: 'bemerkungen', label: 'Bemerkungen', type: 'string/textarea' },
   { key: 'dokument_nachweis', label: 'Nachweisdokument', type: 'file' },
 ];
+const FORDERUNGSERFASSUNG_FIELDS = [
+  { key: 'rechnungsnummer', label: 'Rechnungsnummer', type: 'string/text' },
+  { key: 'rechnungsdatum', label: 'Rechnungsdatum', type: 'date/date' },
+  { key: 'faelligkeitsdatum', label: 'Fälligkeitsdatum', type: 'date/date' },
+  { key: 'rechnungsbetrag', label: 'Rechnungsbetrag (€)', type: 'number' },
+  { key: 'gezahlter_betrag', label: 'Bereits gezahlter Betrag (€)', type: 'number' },
+  { key: 'zahlungsstatus', label: 'Zahlungsstatus', type: 'lookup/select', options: [{ key: 'offen', label: 'Offen' }, { key: 'teilweise_bezahlt', label: 'Teilweise bezahlt' }, { key: 'vollstaendig_bezahlt', label: 'Vollständig bezahlt' }, { key: 'ueberzahlt', label: 'Überzahlt' }] },
+  { key: 'schuldner', label: 'Schuldner', type: 'applookup/select', targetEntity: 'debitor', targetAppId: 'DEBITOR', displayField: 'kundennummer' },
+  { key: 'notizen_forderung', label: 'Notizen zur Forderung', type: 'string/textarea' },
+  { key: 'dokument_rechnung', label: 'Rechnungsdokument', type: 'file' },
+];
+const DEBITOR_FIELDS = [
+  { key: 'kundennummer', label: 'Kundennummer', type: 'string/text' },
+  { key: 'schuldner_vorname', label: 'Vorname', type: 'string/text' },
+  { key: 'schuldner_nachname', label: 'Nachname', type: 'string/text' },
+  { key: 'unternehmen', label: 'Unternehmen', type: 'string/text' },
+  { key: 'letzter_vorgang', label: 'Letzter Vorgang', type: 'date/date' },
+  { key: 'strasse', label: 'Straße', type: 'string/text' },
+  { key: 'hausnummer', label: 'Hausnummer', type: 'string/text' },
+  { key: 'postleitzahl', label: 'Postleitzahl', type: 'string/text' },
+  { key: 'ort', label: 'Ort', type: 'string/text' },
+  { key: 'email', label: 'E-Mail-Adresse', type: 'string/email' },
+  { key: 'telefon', label: 'Telefonnummer', type: 'string/tel' },
+  { key: 'notizen_schuldner', label: 'Notizen', type: 'string/textarea' },
+];
 
 const ENTITY_TABS = [
-  { key: 'schuldnerverwaltung', label: 'Schuldnerverwaltung', pascal: 'Schuldnerverwaltung' },
-  { key: 'forderungserfassung', label: 'Forderungserfassung', pascal: 'Forderungserfassung' },
   { key: 'ueberzahlungsbearbeitung', label: 'Überzahlungsbearbeitung', pascal: 'Ueberzahlungsbearbeitung' },
+  { key: 'forderungserfassung', label: 'Forderungserfassung', pascal: 'Forderungserfassung' },
+  { key: 'debitor', label: 'Debitor', pascal: 'Debitor' },
 ] as const;
 
 type EntityKey = typeof ENTITY_TABS[number]['key'];
@@ -87,16 +87,16 @@ export default function AdminPage() {
   const data = useDashboardData();
   const { loading, error, fetchAll } = data;
 
-  const [activeTab, setActiveTab] = useState<EntityKey>('schuldnerverwaltung');
+  const [activeTab, setActiveTab] = useState<EntityKey>('ueberzahlungsbearbeitung');
   const [selectedIds, setSelectedIds] = useState<Record<EntityKey, Set<string>>>(() => ({
-    'schuldnerverwaltung': new Set(),
-    'forderungserfassung': new Set(),
     'ueberzahlungsbearbeitung': new Set(),
+    'forderungserfassung': new Set(),
+    'debitor': new Set(),
   }));
   const [filters, setFilters] = useState<Record<EntityKey, Record<string, string>>>(() => ({
-    'schuldnerverwaltung': {},
-    'forderungserfassung': {},
     'ueberzahlungsbearbeitung': {},
+    'forderungserfassung': {},
+    'debitor': {},
   }));
   const [showFilters, setShowFilters] = useState(false);
   const [dialogState, setDialogState] = useState<{ entity: EntityKey; record: any } | null>(null);
@@ -111,9 +111,9 @@ export default function AdminPage() {
 
   const getRecords = useCallback((entity: EntityKey) => {
     switch (entity) {
-      case 'schuldnerverwaltung': return (data as any).schuldnerverwaltung as Schuldnerverwaltung[] ?? [];
-      case 'forderungserfassung': return (data as any).forderungserfassung as Forderungserfassung[] ?? [];
       case 'ueberzahlungsbearbeitung': return (data as any).ueberzahlungsbearbeitung as Ueberzahlungsbearbeitung[] ?? [];
+      case 'forderungserfassung': return (data as any).forderungserfassung as Forderungserfassung[] ?? [];
+      case 'debitor': return (data as any).debitor as Debitor[] ?? [];
       default: return [];
     }
   }, [data]);
@@ -121,11 +121,11 @@ export default function AdminPage() {
   const getLookupLists = useCallback((entity: EntityKey) => {
     const lists: Record<string, any[]> = {};
     switch (entity) {
-      case 'forderungserfassung':
-        lists.schuldnerverwaltungList = (data as any).schuldnerverwaltung ?? [];
-        break;
       case 'ueberzahlungsbearbeitung':
         lists.forderungserfassungList = (data as any).forderungserfassung ?? [];
+        break;
+      case 'forderungserfassung':
+        lists.debitorList = (data as any).debitor ?? [];
         break;
     }
     return lists;
@@ -137,22 +137,22 @@ export default function AdminPage() {
     if (!id) return '—';
     const lists = getLookupLists(entity);
     void fieldKey; // ensure used for noUnusedParameters
-    if (entity === 'forderungserfassung' && fieldKey === 'schuldner') {
-      const match = (lists.schuldnerverwaltungList ?? []).find((r: any) => r.record_id === id);
-      return match?.fields.kundennummer ?? '—';
-    }
     if (entity === 'ueberzahlungsbearbeitung' && fieldKey === 'forderung') {
       const match = (lists.forderungserfassungList ?? []).find((r: any) => r.record_id === id);
       return match?.fields.rechnungsnummer ?? '—';
+    }
+    if (entity === 'forderungserfassung' && fieldKey === 'schuldner') {
+      const match = (lists.debitorList ?? []).find((r: any) => r.record_id === id);
+      return match?.fields.kundennummer ?? '—';
     }
     return String(url);
   }, [getLookupLists]);
 
   const getFieldMeta = useCallback((entity: EntityKey) => {
     switch (entity) {
-      case 'schuldnerverwaltung': return SCHULDNERVERWALTUNG_FIELDS;
-      case 'forderungserfassung': return FORDERUNGSERFASSUNG_FIELDS;
       case 'ueberzahlungsbearbeitung': return UEBERZAHLUNGSBEARBEITUNG_FIELDS;
+      case 'forderungserfassung': return FORDERUNGSERFASSUNG_FIELDS;
+      case 'debitor': return DEBITOR_FIELDS;
       default: return [];
     }
   }, []);
@@ -247,20 +247,20 @@ export default function AdminPage() {
 
   const getServiceMethods = useCallback((entity: EntityKey) => {
     switch (entity) {
-      case 'schuldnerverwaltung': return {
-        create: (fields: any) => LivingAppsService.createSchuldnerverwaltungEntry(fields),
-        update: (id: string, fields: any) => LivingAppsService.updateSchuldnerverwaltungEntry(id, fields),
-        remove: (id: string) => LivingAppsService.deleteSchuldnerverwaltungEntry(id),
+      case 'ueberzahlungsbearbeitung': return {
+        create: (fields: any) => LivingAppsService.createUeberzahlungsbearbeitungEntry(fields),
+        update: (id: string, fields: any) => LivingAppsService.updateUeberzahlungsbearbeitungEntry(id, fields),
+        remove: (id: string) => LivingAppsService.deleteUeberzahlungsbearbeitungEntry(id),
       };
       case 'forderungserfassung': return {
         create: (fields: any) => LivingAppsService.createForderungserfassungEntry(fields),
         update: (id: string, fields: any) => LivingAppsService.updateForderungserfassungEntry(id, fields),
         remove: (id: string) => LivingAppsService.deleteForderungserfassungEntry(id),
       };
-      case 'ueberzahlungsbearbeitung': return {
-        create: (fields: any) => LivingAppsService.createUeberzahlungsbearbeitungEntry(fields),
-        update: (id: string, fields: any) => LivingAppsService.updateUeberzahlungsbearbeitungEntry(id, fields),
-        remove: (id: string) => LivingAppsService.deleteUeberzahlungsbearbeitungEntry(id),
+      case 'debitor': return {
+        create: (fields: any) => LivingAppsService.createDebitorEntry(fields),
+        update: (id: string, fields: any) => LivingAppsService.updateDebitorEntry(id, fields),
+        remove: (id: string) => LivingAppsService.deleteDebitorEntry(id),
       };
       default: return null;
     }
@@ -602,27 +602,6 @@ export default function AdminPage() {
         </Table>
       </div>
 
-      {(createEntity === 'schuldnerverwaltung' || dialogState?.entity === 'schuldnerverwaltung') && (
-        <SchuldnerverwaltungDialog
-          open={createEntity === 'schuldnerverwaltung' || dialogState?.entity === 'schuldnerverwaltung'}
-          onClose={() => { setCreateEntity(null); setDialogState(null); }}
-          onSubmit={dialogState?.entity === 'schuldnerverwaltung' ? handleUpdate : (fields: any) => handleCreate('schuldnerverwaltung', fields)}
-          defaultValues={dialogState?.entity === 'schuldnerverwaltung' ? dialogState.record?.fields : undefined}
-          enablePhotoScan={AI_PHOTO_SCAN['Schuldnerverwaltung']}
-          enablePhotoLocation={AI_PHOTO_LOCATION['Schuldnerverwaltung']}
-        />
-      )}
-      {(createEntity === 'forderungserfassung' || dialogState?.entity === 'forderungserfassung') && (
-        <ForderungserfassungDialog
-          open={createEntity === 'forderungserfassung' || dialogState?.entity === 'forderungserfassung'}
-          onClose={() => { setCreateEntity(null); setDialogState(null); }}
-          onSubmit={dialogState?.entity === 'forderungserfassung' ? handleUpdate : (fields: any) => handleCreate('forderungserfassung', fields)}
-          defaultValues={dialogState?.entity === 'forderungserfassung' ? dialogState.record?.fields : undefined}
-          schuldnerverwaltungList={(data as any).schuldnerverwaltung ?? []}
-          enablePhotoScan={AI_PHOTO_SCAN['Forderungserfassung']}
-          enablePhotoLocation={AI_PHOTO_LOCATION['Forderungserfassung']}
-        />
-      )}
       {(createEntity === 'ueberzahlungsbearbeitung' || dialogState?.entity === 'ueberzahlungsbearbeitung') && (
         <UeberzahlungsbearbeitungDialog
           open={createEntity === 'ueberzahlungsbearbeitung' || dialogState?.entity === 'ueberzahlungsbearbeitung'}
@@ -634,21 +613,25 @@ export default function AdminPage() {
           enablePhotoLocation={AI_PHOTO_LOCATION['Ueberzahlungsbearbeitung']}
         />
       )}
-      {viewState?.entity === 'schuldnerverwaltung' && (
-        <SchuldnerverwaltungViewDialog
-          open={viewState?.entity === 'schuldnerverwaltung'}
-          onClose={() => setViewState(null)}
-          record={viewState?.record}
-          onEdit={(r: any) => { setViewState(null); setDialogState({ entity: 'schuldnerverwaltung', record: r }); }}
+      {(createEntity === 'forderungserfassung' || dialogState?.entity === 'forderungserfassung') && (
+        <ForderungserfassungDialog
+          open={createEntity === 'forderungserfassung' || dialogState?.entity === 'forderungserfassung'}
+          onClose={() => { setCreateEntity(null); setDialogState(null); }}
+          onSubmit={dialogState?.entity === 'forderungserfassung' ? handleUpdate : (fields: any) => handleCreate('forderungserfassung', fields)}
+          defaultValues={dialogState?.entity === 'forderungserfassung' ? dialogState.record?.fields : undefined}
+          debitorList={(data as any).debitor ?? []}
+          enablePhotoScan={AI_PHOTO_SCAN['Forderungserfassung']}
+          enablePhotoLocation={AI_PHOTO_LOCATION['Forderungserfassung']}
         />
       )}
-      {viewState?.entity === 'forderungserfassung' && (
-        <ForderungserfassungViewDialog
-          open={viewState?.entity === 'forderungserfassung'}
-          onClose={() => setViewState(null)}
-          record={viewState?.record}
-          onEdit={(r: any) => { setViewState(null); setDialogState({ entity: 'forderungserfassung', record: r }); }}
-          schuldnerverwaltungList={(data as any).schuldnerverwaltung ?? []}
+      {(createEntity === 'debitor' || dialogState?.entity === 'debitor') && (
+        <DebitorDialog
+          open={createEntity === 'debitor' || dialogState?.entity === 'debitor'}
+          onClose={() => { setCreateEntity(null); setDialogState(null); }}
+          onSubmit={dialogState?.entity === 'debitor' ? handleUpdate : (fields: any) => handleCreate('debitor', fields)}
+          defaultValues={dialogState?.entity === 'debitor' ? dialogState.record?.fields : undefined}
+          enablePhotoScan={AI_PHOTO_SCAN['Debitor']}
+          enablePhotoLocation={AI_PHOTO_LOCATION['Debitor']}
         />
       )}
       {viewState?.entity === 'ueberzahlungsbearbeitung' && (
@@ -658,6 +641,23 @@ export default function AdminPage() {
           record={viewState?.record}
           onEdit={(r: any) => { setViewState(null); setDialogState({ entity: 'ueberzahlungsbearbeitung', record: r }); }}
           forderungserfassungList={(data as any).forderungserfassung ?? []}
+        />
+      )}
+      {viewState?.entity === 'forderungserfassung' && (
+        <ForderungserfassungViewDialog
+          open={viewState?.entity === 'forderungserfassung'}
+          onClose={() => setViewState(null)}
+          record={viewState?.record}
+          onEdit={(r: any) => { setViewState(null); setDialogState({ entity: 'forderungserfassung', record: r }); }}
+          debitorList={(data as any).debitor ?? []}
+        />
+      )}
+      {viewState?.entity === 'debitor' && (
+        <DebitorViewDialog
+          open={viewState?.entity === 'debitor'}
+          onClose={() => setViewState(null)}
+          record={viewState?.record}
+          onEdit={(r: any) => { setViewState(null); setDialogState({ entity: 'debitor', record: r }); }}
         />
       )}
 

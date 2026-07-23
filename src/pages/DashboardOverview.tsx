@@ -1,7 +1,7 @@
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { enrichForderungserfassung, enrichUeberzahlungsbearbeitung } from '@/lib/enrich';
 import type { EnrichedForderungserfassung, EnrichedUeberzahlungsbearbeitung } from '@/types/enriched';
-import type { Schuldnerverwaltung } from '@/types/app';
+import type { Debitor as Schuldnerverwaltung } from '@/types/app';
 import { APP_IDS, LOOKUP_OPTIONS } from '@/types/app';
 import { LivingAppsService, extractRecordId, createRecordUrl } from '@/services/livingAppsService';
 import { formatDate, formatCurrency } from '@/lib/formatters';
@@ -84,12 +84,12 @@ function bearbeitungsstatusColor(key: string | undefined) {
 
 export default function DashboardOverview() {
   const {
-    schuldnerverwaltung, forderungserfassung, ueberzahlungsbearbeitung,
-    schuldnerverwaltungMap, forderungserfassungMap,
+    debitor: schuldnerverwaltung, forderungserfassung, ueberzahlungsbearbeitung,
+    debitorMap: schuldnerverwaltungMap, forderungserfassungMap,
     loading, error, fetchAll,
   } = useDashboardData();
 
-  const enrichedForderungserfassung = enrichForderungserfassung(forderungserfassung, { schuldnerverwaltungMap });
+  const enrichedForderungserfassung = enrichForderungserfassung(forderungserfassung, { debitorMap: schuldnerverwaltungMap });
   const enrichedUeberzahlungsbearbeitung = enrichUeberzahlungsbearbeitung(ueberzahlungsbearbeitung, { forderungserfassungMap });
 
   // All hooks before early returns
@@ -568,7 +568,7 @@ export default function DashboardOverview() {
               <RecordField label="Notizen" value={currentSchuldner.fields.notizen_schuldner} format="longtext" hideEmpty />
             </RecordSection>
           )}
-          <RecordAttachments appId={APP_IDS.SCHULDNERVERWALTUNG} recordId={currentSchuldner.record_id} />
+          <RecordAttachments appId={APP_IDS.DEBITOR} recordId={currentSchuldner.record_id} />
         </RecordOverlay>
       )}
 
@@ -580,7 +580,7 @@ export default function DashboardOverview() {
           await LivingAppsService.createForderungserfassungEntry(fields);
           fetchAll();
         }}
-        schuldnerverwaltungList={schuldnerverwaltung}
+        debitorList={schuldnerverwaltung}
         enablePhotoScan={AI_PHOTO_SCAN['Forderungserfassung']}
         enablePhotoLocation={AI_PHOTO_LOCATION['Forderungserfassung']}
       />
@@ -595,7 +595,7 @@ export default function DashboardOverview() {
         }}
         defaultValues={editForderung?.fields}
         recordId={editForderung?.record_id}
-        schuldnerverwaltungList={schuldnerverwaltung}
+        debitorList={schuldnerverwaltung}
         enablePhotoScan={AI_PHOTO_SCAN['Forderungserfassung']}
         enablePhotoLocation={AI_PHOTO_LOCATION['Forderungserfassung']}
       />
@@ -604,7 +604,7 @@ export default function DashboardOverview() {
         open={createSchuldnerOpen}
         onClose={() => setCreateSchuldnerOpen(false)}
         onSubmit={async (fields) => {
-          await LivingAppsService.createSchuldnerverwaltungEntry(fields);
+          await LivingAppsService.createDebitorEntry(fields);
           fetchAll();
         }}
         enablePhotoScan={AI_PHOTO_SCAN['Schuldnerverwaltung']}
@@ -616,7 +616,7 @@ export default function DashboardOverview() {
         onClose={() => setEditSchuldner(null)}
         onSubmit={async (fields) => {
           if (!editSchuldner) return;
-          await LivingAppsService.updateSchuldnerverwaltungEntry(editSchuldner.record_id, fields);
+          await LivingAppsService.updateDebitorEntry(editSchuldner.record_id, fields);
           fetchAll();
         }}
         defaultValues={editSchuldner?.fields}

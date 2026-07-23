@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LivingAppsService, extractRecordId, createRecordUrl } from '@/services/livingAppsService';
-import type { Forderungserfassung, Schuldnerverwaltung } from '@/types/app';
+import type { Forderungserfassung, Debitor } from '@/types/app';
 import { APP_IDS } from '@/types/app';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,19 +33,19 @@ export default function ForderungserfassungPage() {
   const [deleteTarget, setDeleteTarget] = useState<Forderungserfassung | null>(null);
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [schuldnerverwaltungList, setSchuldnerverwaltungList] = useState<Schuldnerverwaltung[]>([]);
+  const [debitorList, setDebitorList] = useState<Debitor[]>([]);
 
   useEffect(() => { loadData(); }, []);
 
   async function loadData() {
     setLoading(true);
     try {
-      const [mainData, schuldnerverwaltungData] = await Promise.all([
+      const [mainData, debitorData] = await Promise.all([
         LivingAppsService.getForderungserfassung(),
-        LivingAppsService.getSchuldnerverwaltung(),
+        LivingAppsService.getDebitor(),
       ]);
       setRecords(mainData);
-      setSchuldnerverwaltungList(schuldnerverwaltungData);
+      setDebitorList(debitorData);
     } finally {
       setLoading(false);
     }
@@ -71,10 +71,10 @@ export default function ForderungserfassungPage() {
     setDeleteTarget(null);
   }
 
-  function getSchuldnerverwaltungDisplayName(url?: unknown) {
+  function getDebitorDisplayName(url?: unknown) {
     if (!url) return '—';
     const id = extractRecordId(url);
-    return schuldnerverwaltungList.find(r => r.record_id === id)?.fields.kundennummer ?? '—';
+    return debitorList.find(r => r.record_id === id)?.fields.kundennummer ?? '—';
   }
 
   const filtered = records.filter(r => {
@@ -206,7 +206,7 @@ export default function ForderungserfassungPage() {
                 <TableCell>{record.fields.rechnungsbetrag ?? '—'}</TableCell>
                 <TableCell>{record.fields.gezahlter_betrag ?? '—'}</TableCell>
                 <TableCell><span className="inline-flex items-center bg-secondary border border-[#bfdbfe] text-[#2563eb] rounded-[10px] px-2 py-1 text-sm font-medium">{record.fields.zahlungsstatus?.label ?? '—'}</span></TableCell>
-                <TableCell><span className="inline-flex items-center bg-secondary border border-[#bfdbfe] text-[#2563eb] rounded-[10px] px-2 py-1 text-sm font-medium">{getSchuldnerverwaltungDisplayName(record.fields.schuldner)}</span></TableCell>
+                <TableCell><span className="inline-flex items-center bg-secondary border border-[#bfdbfe] text-[#2563eb] rounded-[10px] px-2 py-1 text-sm font-medium">{getDebitorDisplayName(record.fields.schuldner)}</span></TableCell>
                 <TableCell className="max-w-xs"><span className="truncate block">{record.fields.notizen_forderung ?? '—'}</span></TableCell>
                 <TableCell>{record.fields.dokument_rechnung ? <div className="relative h-8 w-8 rounded bg-muted overflow-hidden"><div className="absolute inset-0 flex items-center justify-center"><IconFileText size={14} className="text-muted-foreground" /></div><img src={record.fields.dokument_rechnung} alt="" className="relative h-full w-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} /></div> : '—'}</TableCell>
                 <TableCell>
@@ -238,7 +238,7 @@ export default function ForderungserfassungPage() {
         onSubmit={editingRecord ? handleUpdate : handleCreate}
         defaultValues={editingRecord?.fields}
         recordId={editingRecord?.record_id}
-        schuldnerverwaltungList={schuldnerverwaltungList}
+        debitorList={debitorList}
         enablePhotoScan={AI_PHOTO_SCAN['Forderungserfassung']}
         enablePhotoLocation={AI_PHOTO_LOCATION['Forderungserfassung']}
       />

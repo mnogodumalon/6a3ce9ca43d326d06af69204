@@ -1,4 +1,4 @@
-import type { Forderungserfassung, Schuldnerverwaltung } from '@/types/app';
+import type { Forderungserfassung, Debitor } from '@/types/app';
 import { extractRecordId } from '@/services/livingAppsService';
 import {
   Dialog, DialogContent, DialogHeader,
@@ -24,14 +24,14 @@ interface ForderungserfassungViewDialogProps {
   onClose: () => void;
   record: Forderungserfassung | null;
   onEdit: (record: Forderungserfassung) => void;
-  schuldnerverwaltungList: Schuldnerverwaltung[];
+  debitorList: Debitor[];
 }
 
-export function ForderungserfassungViewDialog({ open, onClose, record, onEdit, schuldnerverwaltungList }: ForderungserfassungViewDialogProps) {
-  function getSchuldnerverwaltungDisplayName(url?: unknown) {
+export function ForderungserfassungViewDialog({ open, onClose, record, onEdit, debitorList }: ForderungserfassungViewDialogProps) {
+  function getDebitorDisplayName(url?: unknown) {
     if (!url) return '—';
     const id = extractRecordId(url);
-    return schuldnerverwaltungList.find(r => r.record_id === id)?.fields.kundennummer ?? '—';
+    return debitorList.find(r => r.record_id === id)?.fields.kundennummer ?? '—';
   }
 
   if (!record) return null;
@@ -76,7 +76,7 @@ export function ForderungserfassungViewDialog({ open, onClose, record, onEdit, s
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Schuldner</Label>
-            <p className="text-sm">{getSchuldnerverwaltungDisplayName(record.fields.schuldner)}</p>
+            <p className="text-sm">{getDebitorDisplayName(record.fields.schuldner)}</p>
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Notizen zur Forderung</Label>

@@ -1,4 +1,4 @@
-import type { Schuldnerverwaltung } from '@/types/app';
+import type { Debitor as Schuldnerverwaltung } from '@/types/app';
 import {
   Dialog, DialogContent, DialogHeader,
   DialogTitle,
@@ -89,7 +89,7 @@ export function SchuldnerverwaltungViewDialog({ open, onClose, record, onEdit }:
             <p className="text-sm whitespace-pre-wrap">{record.fields.notizen_schuldner ?? '—'}</p>
           </div>
           <div className="pt-2 border-t border-border">
-            <AttachmentsSection appId={APP_IDS.SCHULDNERVERWALTUNG} recordId={record.record_id} readOnly />
+            <AttachmentsSection appId={APP_IDS.DEBITOR} recordId={record.record_id} readOnly />
           </div>
         </div>
       </DialogContent>

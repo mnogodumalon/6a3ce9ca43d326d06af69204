@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LivingAppsService, extractRecordId, createRecordUrl } from '@/services/livingAppsService';
-import type { Schuldnerverwaltung } from '@/types/app';
+import type { Debitor as Schuldnerverwaltung } from '@/types/app';
 import { APP_IDS } from '@/types/app';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,28 +38,28 @@ export default function SchuldnerverwaltungPage() {
   async function loadData() {
     setLoading(true);
     try {
-      setRecords(await LivingAppsService.getSchuldnerverwaltung());
+      setRecords(await LivingAppsService.getDebitor());
     } finally {
       setLoading(false);
     }
   }
 
   async function handleCreate(fields: Schuldnerverwaltung['fields']) {
-    await LivingAppsService.createSchuldnerverwaltungEntry(fields);
+    await LivingAppsService.createDebitorEntry(fields);
     await loadData();
     setDialogOpen(false);
   }
 
   async function handleUpdate(fields: Schuldnerverwaltung['fields']) {
     if (!editingRecord) return;
-    await LivingAppsService.updateSchuldnerverwaltungEntry(editingRecord.record_id, fields);
+    await LivingAppsService.updateDebitorEntry(editingRecord.record_id, fields);
     await loadData();
     setEditingRecord(null);
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    await LivingAppsService.deleteSchuldnerverwaltungEntry(deleteTarget.record_id);
+    await LivingAppsService.deleteDebitorEntry(deleteTarget.record_id);
     setRecords(prev => prev.filter(r => r.record_id !== deleteTarget.record_id));
     setDeleteTarget(null);
   }

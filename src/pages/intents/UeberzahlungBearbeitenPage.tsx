@@ -38,7 +38,7 @@ function formatEuro(val: number | undefined): string {
 
 export default function UeberzahlungBearbeitenPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { forderungserfassung, schuldnerverwaltungMap, loading, error, fetchAll } = useDashboardData();
+  const { forderungserfassung, debitorMap: schuldnerverwaltungMap, loading, error, fetchAll } = useDashboardData();
 
   // Wizard state
   const [step, setStep] = useState(1);
@@ -95,7 +95,7 @@ export default function UeberzahlungBearbeitenPage() {
 
   // Enrich forderungen
   const enrichedForderungen = useMemo(() =>
-    enrichForderungserfassung(forderungserfassung, { schuldnerverwaltungMap }),
+    enrichForderungserfassung(forderungserfassung, { debitorMap: schuldnerverwaltungMap }),
     [forderungserfassung, schuldnerverwaltungMap]
   );
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { LivingAppsService, extractRecordId } from '@/services/livingAppsService';
-import type { Schuldnerverwaltung } from '@/types/app';
+import type { Debitor as Schuldnerverwaltung } from '@/types/app';
 import { APP_IDS } from '@/types/app';
 import { Button } from '@/components/ui/button';
 import { IconArrowLeft, IconTrash } from '@tabler/icons-react';
@@ -28,7 +28,7 @@ export default function SchuldnerverwaltungDetailPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const list = await LivingAppsService.getSchuldnerverwaltung();
+      const list = await LivingAppsService.getDebitor();
       setRecord(list.find(r => r.record_id === id) ?? null);
     } finally {
       setLoading(false);
@@ -37,14 +37,14 @@ export default function SchuldnerverwaltungDetailPage() {
 
   async function handleUpdate(fields: Schuldnerverwaltung['fields']) {
     if (!record) return;
-    await LivingAppsService.updateSchuldnerverwaltungEntry(record.record_id, fields);
+    await LivingAppsService.updateDebitorEntry(record.record_id, fields);
     await loadData();
     setEditing(false);
   }
 
   async function handleDelete() {
     if (!record) return;
-    await LivingAppsService.deleteSchuldnerverwaltungEntry(record.record_id);
+    await LivingAppsService.deleteDebitorEntry(record.record_id);
     setDeleteOpen(false);
     navigate('/schuldnerverwaltung');
   }
@@ -109,7 +109,7 @@ export default function SchuldnerverwaltungDetailPage() {
         <RecordField label="Notizen" value={record.fields.notizen_schuldner} format="longtext" className="md:col-span-2" />
       </RecordSection>
 
-      <RecordAttachments appId={APP_IDS.SCHULDNERVERWALTUNG} recordId={record.record_id} />
+      <RecordAttachments appId={APP_IDS.DEBITOR} recordId={record.record_id} />
 
       <div className="flex justify-end pt-2">
         <Button variant="ghost" onClick={() => setDeleteOpen(true)} className="text-destructive hover:text-destructive">

@@ -21,43 +21,6 @@ export interface AttachmentInput {
   active?: boolean;
 }
 
-export interface Schuldnerverwaltung {
-  record_id: string;
-  createdat: string;
-  updatedat: string | null;
-  fields: {
-    kundennummer?: string;
-    schuldner_vorname?: string;
-    schuldner_nachname?: string;
-    unternehmen?: string;
-    letzter_vorgang?: string; // Format: YYYY-MM-DD oder ISO String
-    strasse?: string;
-    hausnummer?: string;
-    postleitzahl?: string;
-    ort?: string;
-    email?: string;
-    telefon?: string;
-    notizen_schuldner?: string;
-  };
-}
-
-export interface Forderungserfassung {
-  record_id: string;
-  createdat: string;
-  updatedat: string | null;
-  fields: {
-    rechnungsnummer?: string;
-    rechnungsdatum?: string; // Format: YYYY-MM-DD oder ISO String
-    faelligkeitsdatum?: string; // Format: YYYY-MM-DD oder ISO String
-    rechnungsbetrag?: number;
-    gezahlter_betrag?: number;
-    zahlungsstatus?: LookupValue;
-    schuldner?: string; // applookup -> URL zu 'Schuldnerverwaltung' Record
-    notizen_forderung?: string;
-    dokument_rechnung?: string;
-  };
-}
-
 export interface Ueberzahlungsbearbeitung {
   record_id: string;
   createdat: string;
@@ -79,49 +42,61 @@ export interface Ueberzahlungsbearbeitung {
   };
 }
 
+export interface Forderungserfassung {
+  record_id: string;
+  createdat: string;
+  updatedat: string | null;
+  fields: {
+    rechnungsnummer?: string;
+    rechnungsdatum?: string; // Format: YYYY-MM-DD oder ISO String
+    faelligkeitsdatum?: string; // Format: YYYY-MM-DD oder ISO String
+    rechnungsbetrag?: number;
+    gezahlter_betrag?: number;
+    zahlungsstatus?: LookupValue;
+    schuldner?: string; // applookup -> URL zu 'Debitor' Record
+    notizen_forderung?: string;
+    dokument_rechnung?: string;
+  };
+}
+
+export interface Debitor {
+  record_id: string;
+  createdat: string;
+  updatedat: string | null;
+  fields: {
+    kundennummer?: string;
+    schuldner_vorname?: string;
+    schuldner_nachname?: string;
+    unternehmen?: string;
+    letzter_vorgang?: string; // Format: YYYY-MM-DD oder ISO String
+    strasse?: string;
+    hausnummer?: string;
+    postleitzahl?: string;
+    ort?: string;
+    email?: string;
+    telefon?: string;
+    notizen_schuldner?: string;
+  };
+}
+
 export const APP_IDS = {
-  SCHULDNERVERWALTUNG: '6a3ce9ac1cefa9ec46d6187c',
-  FORDERUNGSERFASSUNG: '6a3ce9b3ef6a8494f3a048fe',
   UEBERZAHLUNGSBEARBEITUNG: '6a3ce9b4ba6cf5eebd9f2f1b',
+  FORDERUNGSERFASSUNG: '6a3ce9b3ef6a8494f3a048fe',
+  DEBITOR: '6a3ce9ac1cefa9ec46d6187c',
 } as const;
 
 
 export const LOOKUP_OPTIONS: Record<string, Record<string, {key: string, label: string}[]>> = {
-  'forderungserfassung': {
-    zahlungsstatus: [{ key: "offen", label: "Offen" }, { key: "teilweise_bezahlt", label: "Teilweise bezahlt" }, { key: "vollstaendig_bezahlt", label: "Vollständig bezahlt" }, { key: "ueberzahlt", label: "Überzahlt" }],
-  },
   'ueberzahlungsbearbeitung': {
     massnahme: [{ key: "rueckerstattung", label: "Rückerstattung" }, { key: "verrechnung", label: "Verrechnung mit anderer Forderung" }, { key: "gutschrift", label: "Gutschrift" }, { key: "sonstiges", label: "Sonstiges" }],
     bearbeitungsstatus: [{ key: "offen", label: "Offen" }, { key: "in_bearbeitung", label: "In Bearbeitung" }, { key: "abgeschlossen", label: "Abgeschlossen" }],
   },
+  'forderungserfassung': {
+    zahlungsstatus: [{ key: "offen", label: "Offen" }, { key: "teilweise_bezahlt", label: "Teilweise bezahlt" }, { key: "vollstaendig_bezahlt", label: "Vollständig bezahlt" }, { key: "ueberzahlt", label: "Überzahlt" }],
+  },
 };
 
 export const FIELD_TYPES: Record<string, Record<string, string>> = {
-  'schuldnerverwaltung': {
-    'kundennummer': 'string/text',
-    'schuldner_vorname': 'string/text',
-    'schuldner_nachname': 'string/text',
-    'unternehmen': 'string/text',
-    'letzter_vorgang': 'date/date',
-    'strasse': 'string/text',
-    'hausnummer': 'string/text',
-    'postleitzahl': 'string/text',
-    'ort': 'string/text',
-    'email': 'string/email',
-    'telefon': 'string/tel',
-    'notizen_schuldner': 'string/textarea',
-  },
-  'forderungserfassung': {
-    'rechnungsnummer': 'string/text',
-    'rechnungsdatum': 'date/date',
-    'faelligkeitsdatum': 'date/date',
-    'rechnungsbetrag': 'number',
-    'gezahlter_betrag': 'number',
-    'zahlungsstatus': 'lookup/select',
-    'schuldner': 'applookup/select',
-    'notizen_forderung': 'string/textarea',
-    'dokument_rechnung': 'file',
-  },
   'ueberzahlungsbearbeitung': {
     'forderung': 'applookup/select',
     'ueberzahlter_betrag': 'number',
@@ -137,6 +112,34 @@ export const FIELD_TYPES: Record<string, Record<string, string>> = {
     'bemerkungen': 'string/textarea',
     'dokument_nachweis': 'file',
   },
+  'forderungserfassung': {
+    'rechnungsnummer': 'string/text',
+    'rechnungsdatum': 'date/date',
+    'faelligkeitsdatum': 'date/date',
+    'rechnungsbetrag': 'number',
+    'gezahlter_betrag': 'number',
+    'zahlungsstatus': 'lookup/select',
+    'schuldner': 'applookup/select',
+    'notizen_forderung': 'string/textarea',
+    'dokument_rechnung': 'file',
+  },
+  'debitor': {
+    'kundennummer': 'string/text',
+    'schuldner_vorname': 'string/text',
+    'schuldner_nachname': 'string/text',
+    'unternehmen': 'string/text',
+    'letzter_vorgang': 'date/date',
+    'strasse': 'string/text',
+    'hausnummer': 'string/text',
+    'postleitzahl': 'string/text',
+    'ort': 'string/text',
+    'email': 'string/email',
+    'telefon': 'string/tel',
+    'notizen_schuldner': 'string/textarea',
+  },
+};
+
+export const HUB_TOPOLOGY: Record<string, { field: string; entity: string }[]> = {
 };
 
 type StripLookup<T> = {
@@ -146,6 +149,6 @@ type StripLookup<T> = {
 };
 
 // Helper Types for creating new records (lookup fields as plain strings for API)
-export type CreateSchuldnerverwaltung = StripLookup<Schuldnerverwaltung['fields']>;
-export type CreateForderungserfassung = StripLookup<Forderungserfassung['fields']>;
 export type CreateUeberzahlungsbearbeitung = StripLookup<Ueberzahlungsbearbeitung['fields']>;
+export type CreateForderungserfassung = StripLookup<Forderungserfassung['fields']>;
+export type CreateDebitor = StripLookup<Debitor['fields']>;
